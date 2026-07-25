@@ -148,6 +148,21 @@ footer {
     color: var(--text-muted);
 }
 
+.footer-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.footer-social {
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    transition: color 0.15s;
+}
+
+.footer-social:hover { color: var(--text); }
+
 .footer-links { display: flex; gap: 6px; flex-wrap: wrap; }
 
 .chain-badge {
