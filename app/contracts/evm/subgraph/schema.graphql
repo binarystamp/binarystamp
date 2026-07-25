@@ -1,0 +1,42 @@
+type Stamp @entity(immutable: false) {
+  id: ID!
+  fileHash: Bytes!
+  metadataHash: Bytes!
+  walrusBlobId: String!
+  owner: Bytes!
+  timestamp: BigInt!
+  stampNumber: BigInt!
+  description: String!
+  transfers: [Transfer!]! @derivedFrom(field: "stamp")
+  createdAt: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type Transfer @entity(immutable: true) {
+  id: ID!
+  stamp: Stamp!
+  fileHash: Bytes!
+  from: Bytes!
+  to: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type FileHashLookup @entity(immutable: false) {
+  "fileHash as ID for quick lookups"
+  id: ID!
+  fileHash: Bytes!
+  stamps: [Stamp!]!
+  latestOwner: Bytes!
+  stampCount: BigInt!
+  firstStampedAt: BigInt!
+}
+
+type OwnerStats @entity(immutable: false) {
+  "owner address as ID"
+  id: ID!
+  stampCount: BigInt!
+  stamps: [Stamp!]!
+}

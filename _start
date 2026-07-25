@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$DIR"
+
+info()    { echo -e "${BLUE}i${NC} $*"; }
+success() { echo -e "${GREEN}✓${NC} $*"; }
+warn()    { echo -e "${YELLOW}⚠${NC} $*"; }
+error()   { echo -e "${RED}✗${NC} $*"; }
+
+case "${1:-help}" in
+    up)
+        info "Starting BinaryStamp on port 8082..."
+        if command -v docker-compose &>/dev/null; then
+            docker-compose up -d --build
+        elif [ -f app/requirements.txt ]; then
+            cd app
+            if [ ! -d venv ]; then
+                python3 -m venv venv
+                ./venv/bin/pip install -r requirements.txt
+            fi
+            if [ -f ../.env ]; then
+                set -a; source ../.env; set +a
+            fi
+            export PORT=${PORT:-8082}
+            ./venv/bin/python app.py &
+            echo $! > ../.pid
+        fi
+        success "BinaryStamp started at http://localhost:8082"
+        ;;
+    down)
+        info "Stopping BinaryStamp..."
+        if command -v docker-compose &>/dev/null; then
+            docker-compose down
+        elif [ -f .pid ]; then
+            kill "$(cat .pid)" 2>/dev/null || true
+            rm -f .pid
+        fi
+        success "Stopped"
+        ;;
+    restart)
+        "$0" down
+        "$0" up
+        ;;
+    status)
+        if command -v docker-compose &>/dev/null; then
+            docker-compose ps
+        elif [ -f .pid ] && kill -0 "$(cat .pid)" 2>/dev/null; then
+            success "Running (PID: $(cat .pid))"
+        else
+            warn "Not running"
+        fi
+        ;;
+    logs)
+        shift
+        if command -v docker-compose &>/dev/null; then
+            docker-compose logs "$@"
+        else
+            warn "Logs only available with Docker"
+        fi
+        ;;
+    test)
+        info "Running tests..."
+        cd app
+        if [ -d venv ]; then
+            ./venv/bin/python -m pytest tests/ -v
+        else
+            python3 -m pytest tests/ -v
+        fi
+        ;;
+    build)
+        info "Building..."
+        if command -v docker-compose &>/dev/null; then
+            docker-compose build
+        fi
+        success "Build complete"
+        ;;
+    clean)
+        info "Cleaning..."
+        if command -v docker-compose &>/dev/null; then
+            docker-compose down -v --rmi local
+        fi
+        rm -rf app/venv app/__pycache__ .pid
+        success "Cleaned"
+        ;;
+    dev)
+        info "Starting in development mode..."
+        cd app
+        if [ ! -d venv ]; then
+            python3 -m venv venv
+            ./venv/bin/pip install -r requirements.txt
+        fi
+        if [ -f ../.env ]; then
+            set -a; source ../.env; set +a
+        fi
+        export PORT=${PORT:-8082}
+        export ENVIRONMENT=dev
+        ./venv/bin/python app.py
+        ;;
+    *)
+        echo "BinaryStamp Management"
+        echo ""
+        echo "Usage: $0 <command>"
+        echo ""
+        echo "Commands:"
+        echo "  up       Start the service"
+        echo "  down     Stop the service"
+        echo "  restart  Restart the service"
+        echo "  status   Check service status"
+        echo "  logs     View logs (supports -f)"
+        echo "  test     Run test suite"
+        echo "  build    Build containers"
+        echo "  clean    Clean up resources"
+        echo "  dev      Run in development mode"
+        ;;
+esac

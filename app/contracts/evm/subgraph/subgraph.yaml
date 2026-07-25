@@ -1,0 +1,29 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: BinaryStamp
+    network: base-sepolia
+    source:
+      address: "0x5969D7558d3409ac70ebdF24063AeC7257d0aCe3"
+      abi: BinaryStamp
+      startBlock: 44623546
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Stamp
+        - Transfer
+        - FileHashLookup
+        - OwnerStats
+      abis:
+        - name: BinaryStamp
+          file: ./abis/BinaryStamp.json
+      eventHandlers:
+        - event: StampCreated(indexed bytes32,bytes32,string,indexed address,uint256,indexed uint256,string)
+          handler: handleStampCreated
+        - event: StampTransferred(indexed bytes32,indexed address,indexed address,uint256)
+          handler: handleStampTransferred
+      file: ./src/mapping.ts
