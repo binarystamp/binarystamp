@@ -1,0 +1,65 @@
+name: Deploy Sui Move Contract
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Sui CLI
+        run: |
+          curl -fsSL -o sui.tgz "https://github.com/MystenLabs/sui/releases/download/testnet-v1.76.0/sui-testnet-v1.76.0-ubuntu-x86_64.tgz"
+          tar xzf sui.tgz
+          chmod +x sui
+          sudo mv sui /usr/local/bin/
+          sui --version
+
+      - name: Configure Sui Client
+        run: |
+          mkdir -p ~/.sui/sui_config
+          cat > ~/.sui/sui_config/client.yaml << 'YAML'
+          ---
+          keystore:
+            File: ~/.sui/sui_config/sui.keystore
+          envs:
+            - alias: testnet
+              rpc: "https://fullnode.testnet.sui.io:443"
+          active_env: testnet
+          YAML
+          echo '[]' > ~/.sui/sui_config/sui.keystore
+          sui keytool import "${{ secrets.SUI_PRIVATE_KEY_TESTNET }}" ed25519
+          sui client switch --env testnet
+
+      - name: Build Move Package
+        run: |
+          cd sui-package
+          sui move build
+
+      - name: Publish to Sui Testnet
+        run: |
+          cd sui-package
+          RESULT=$(sui client publish --gas-budget 100000000 --json 2>&1)
+          echo "$RESULT"
+          echo "$RESULT" > /tmp/publish-result.json
+
+          # Extract package ID
+          PACKAGE_ID=$(echo "$RESULT" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          for obj in data.get('objectChanges', []):
+              if obj.get('type') == 'published':
+                  print(obj['packageId'])
+                  break
+          ")
+          echo "PACKAGE_ID=$PACKAGE_ID" >> $GITHUB_ENV
+          echo "## Sui Package Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "Package ID: \`$PACKAGE_ID\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: sui-publish-result
+          path: /tmp/publish-result.json
