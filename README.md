@@ -67,6 +67,15 @@ AI Agent (provenance analysis via The Graph)
 | ENS | CCIP-Read (EIP-3668) offchain resolver |
 | AI | Claude API |
 
+## Deployed Contracts
+
+| Contract | Chain | Address |
+|----------|-------|---------|
+| BinaryStamp Registry | Base Sepolia | [`0x5969D7558d3409ac70ebdF24063AeC7257d0aCe3`](https://sepolia.basescan.org/address/0x5969D7558d3409ac70ebdF24063AeC7257d0aCe3) |
+| ENS CCIP-Read Resolver | Ethereum Mainnet | [`0x61DF09Bf03f5693f8928F3aF9364EbC3a4D61D50`](https://etherscan.io/address/0x61DF09Bf03f5693f8928F3aF9364EbC3a4D61D50) |
+| Subgraph | The Graph (Base Sepolia) | [`binarystamp/binarystamp`](https://api.studio.thegraph.com/query/1757003/binarystamp/v0.0.1) |
+| ENS Name | Ethereum Mainnet | [`binarystamp.eth`](https://app.ens.domains/binarystamp.eth) |
+
 ## Links
 
 - Website: https://binarystamp.com
