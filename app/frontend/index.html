@@ -57,12 +57,16 @@
                     <p class="subtitle">Drop a file to hash it and register on-chain</p>
 
                     <div id="drop-zone" class="drop-zone">
-                        <svg viewBox="0 0 48 48" width="48" height="48" class="drop-icon">
+                        <svg viewBox="0 0 48 48" width="48" height="48" class="drop-icon drop-icon-default">
                             <rect x="8" y="8" width="32" height="32" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
                             <line x1="24" y1="16" x2="24" y2="32" stroke="currentColor" stroke-width="2"/>
                             <line x1="16" y1="24" x2="32" y2="24" stroke="currentColor" stroke-width="2"/>
                         </svg>
-                        <span>Drop file here or click to select</span>
+                        <svg viewBox="0 0 48 48" width="48" height="48" class="drop-icon drop-icon-loading hidden">
+                            <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="60 28" class="spinner"/>
+                        </svg>
+                        <span class="drop-text">Drop file here or click to select</span>
+                        <span class="drop-status hidden"></span>
                         <input type="file" id="file-input" hidden>
                     </div>
 
@@ -127,11 +131,15 @@
                     <p class="subtitle">Check if a file or hash has been claimed</p>
 
                     <div id="verify-drop-zone" class="drop-zone">
-                        <svg viewBox="0 0 48 48" width="48" height="48" class="drop-icon">
+                        <svg viewBox="0 0 48 48" width="48" height="48" class="drop-icon drop-icon-default">
                             <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
                             <path d="M20 24 L23 27 L29 21" fill="none" stroke="currentColor" stroke-width="2"/>
                         </svg>
-                        <span>Drop file to verify or enter hash below</span>
+                        <svg viewBox="0 0 48 48" width="48" height="48" class="drop-icon drop-icon-loading hidden">
+                            <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="60 28" class="spinner"/>
+                        </svg>
+                        <span class="drop-text">Drop file to verify or enter hash below</span>
+                        <span class="drop-status hidden"></span>
                         <input type="file" id="verify-file-input" hidden>
                     </div>
 

@@ -109,9 +109,13 @@ function formatSize(bytes) {
 }
 
 async function handleStampFile(file) {
+    const zone = document.getElementById('drop-zone');
+    setDropZoneLoading(zone, true, 'Hashing ' + file.name + '...');
+
     const hash = await hashFile(file);
     currentHash = hash;
 
+    setDropZoneLoading(zone, false);
     document.getElementById('file-hash').textContent = '0x' + hash;
     document.getElementById('file-name').textContent = file.name;
     document.getElementById('file-size').textContent = formatSize(file.size);
@@ -121,9 +125,17 @@ async function handleStampFile(file) {
 }
 
 async function handleVerifyFile(file) {
+    const zone = document.getElementById('verify-drop-zone');
+    const resultEl = document.getElementById('verify-result');
+    resultEl.classList.add('hidden');
+
+    setDropZoneLoading(zone, true, 'Hashing ' + file.name + '...');
     const hash = await hashFile(file);
     document.getElementById('verify-hash-input').value = '0x' + hash;
-    doVerify('0x' + hash);
+
+    setDropZoneLoading(zone, true, 'Looking up hash on-chain...');
+    await doVerify('0x' + hash);
+    setDropZoneLoading(zone, false);
 }
 
 // ============ Buttons ============
@@ -460,6 +472,28 @@ async function checkHealth() {
 }
 
 // ============ Utils ============
+
+function setDropZoneLoading(zone, loading, statusText) {
+    const defaultIcon = zone.querySelector('.drop-icon-default');
+    const loadingIcon = zone.querySelector('.drop-icon-loading');
+    const text = zone.querySelector('.drop-text');
+    const status = zone.querySelector('.drop-status');
+
+    if (loading) {
+        zone.classList.add('loading');
+        defaultIcon.classList.add('hidden');
+        loadingIcon.classList.remove('hidden');
+        text.classList.add('hidden');
+        status.classList.remove('hidden');
+        status.textContent = statusText || 'Processing...';
+    } else {
+        zone.classList.remove('loading');
+        defaultIcon.classList.remove('hidden');
+        loadingIcon.classList.add('hidden');
+        text.classList.remove('hidden');
+        status.classList.add('hidden');
+    }
+}
 
 function escapeHtml(str) {
     const div = document.createElement('div');

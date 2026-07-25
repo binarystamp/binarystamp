@@ -222,6 +222,17 @@ footer {
 
 .drop-zone.dragover { border-color: var(--accent); }
 
+.drop-zone.loading {
+    border-color: var(--text-muted);
+    border-style: solid;
+    pointer-events: none;
+}
+
+.drop-status {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
 .drop-icon { color: var(--text-muted); }
 
 /* ============ Hash Result ============ */
