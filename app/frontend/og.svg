@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0a0a0a"/>
+  <rect x="1" y="1" width="1198" height="3" fill="#fff"/>
+  <rect x="80" y="80" width="1040" height="470" rx="12" fill="#111"/>
+  <rect x="80" y="80" width="1040" height="470" rx="12" fill="none" stroke="#222" stroke-width="1"/>
+  <!-- Logo icon -->
+  <rect x="140" y="240" width="56" height="56" rx="8" fill="none" stroke="#fff" stroke-width="3"/>
+  <circle cx="168" cy="268" r="12" fill="none" stroke="#fff" stroke-width="3"/>
+  <line x1="156" y1="256" x2="180" y2="280" stroke="#fff" stroke-width="3"/>
+  <!-- Text -->
+  <text x="220" y="282" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="48" font-weight="600" fill="#fff" letter-spacing="-1">BinaryStamp</text>
+  <text x="142" y="340" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="22" fill="#999">Prove file ownership on-chain</text>
+  <!-- Tags -->
+  <rect x="142" y="380" width="70" height="28" rx="14" fill="none" stroke="#333" stroke-width="1"/>
+  <text x="177" y="399" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" fill="#666" text-anchor="middle">Base</text>
+  <rect x="222" y="380" width="56" height="28" rx="14" fill="none" stroke="#333" stroke-width="1"/>
+  <text x="250" y="399" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" fill="#666" text-anchor="middle">Sui</text>
+  <rect x="288" y="380" width="70" height="28" rx="14" fill="none" stroke="#333" stroke-width="1"/>
+  <text x="323" y="399" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" fill="#666" text-anchor="middle">ENS</text>
+  <rect x="368" y="380" width="100" height="28" rx="14" fill="none" stroke="#333" stroke-width="1"/>
+  <text x="418" y="399" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" fill="#666" text-anchor="middle">The Graph</text>
+  <rect x="478" y="380" width="76" height="28" rx="14" fill="none" stroke="#333" stroke-width="1"/>
+  <text x="516" y="399" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" fill="#666" text-anchor="middle">Walrus</text>
+  <!-- URL -->
+  <text x="142" y="490" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="16" fill="#444">binarystamp.com</text>
+</svg>
