@@ -171,10 +171,6 @@ function setupButtons() {
 
 // ============ Wallet ============
 
-function shortAddress(address) {
-    return address.slice(0, 6) + '...' + address.slice(-4);
-}
-
 // Reflects whichever wallets are currently connected for the selected chain.
 function renderWallet() {
     const btn = document.getElementById('btn-connect');
@@ -183,8 +179,8 @@ function renderWallet() {
     // List whatever is connected, regardless of the chain currently selected —
     // the point is to show the user they are already signed in.
     const parts = [];
-    if (walletAddress) parts.push(shortAddress(walletAddress));
-    if (suiConnection) parts.push('Sui ' + shortAddress(suiConnection.address));
+    if (walletAddress) parts.push(walletAddress);
+    if (suiConnection) parts.push('Sui ' + suiConnection.address);
 
     if (!parts.length) {
         btn.classList.remove('hidden');
@@ -511,11 +507,10 @@ async function fillOwnerName(slotId, address) {
     const el = document.getElementById(slotId);
     if (!el) return;  // the result was replaced while we were waiting
 
-    // The name is now the identity, so the address drops to corroboration:
-    // abbreviated to stay on one line, full value on hover and in the title.
+    // The name leads, but the address is the identity that actually verifies,
+    // so it stays in full underneath.
     el.innerHTML = '<span class="owner-name">' + escapeHtml(name) + '</span>'
-        + '<span class="owner-address" title="' + escapeHtml(address) + '">'
-        + escapeHtml(shortAddress(address)) + '</span>';
+        + '<span class="owner-address">' + escapeHtml(address) + '</span>';
 }
 
 // ============ Lookup ============
@@ -662,7 +657,9 @@ function showLookupResult(data, hash) {
         html += '<div class="result-history">History (' + data.stamps.length + ' stamps)</div>';
         for (const s of data.stamps) {
             const d = new Date(parseInt(s.timestamp) * 1000).toLocaleString();
-            html += row('#' + s.stampNumber, escapeHtml(s.owner.slice(0, 10) + '... @ ' + d), MONO);
+            html += row('#' + s.stampNumber,
+                        escapeHtml(s.owner) + '<span class="history-date">' + escapeHtml(d) + '</span>',
+                        MONO);
         }
     }
 

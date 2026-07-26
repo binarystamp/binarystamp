@@ -254,13 +254,12 @@ def test_owner_ens_name_is_shown(results):
 
 def test_owner_address_stays_visible_alongside_name(results):
     """A reverse record is a claim by its own owner, so keep the address."""
-    assert results['ENS_SHOWS_SHORT_ADDRESS'] == 'true'
     assert results['ENS_KEEPS_FULL_ADDRESS'] == 'true'
 
 
-def test_owner_address_stays_on_one_line(results):
-    """The full 42-character address wrapped in the narrow value column."""
-    assert results['ENS_ADDRESS_ONE_LINE'] == 'true'
+def test_addresses_are_never_ellipsised(results):
+    """An address is an identity people copy; abbreviating it loses that."""
+    assert results['ENS_ADDRESS_NOT_ELLIPSISED'] == 'true'
 
 
 def test_ens_lookup_causes_no_errors(results):

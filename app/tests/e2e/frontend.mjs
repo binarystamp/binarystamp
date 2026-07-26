@@ -392,11 +392,8 @@ async function transfer(ctx, newOwner) {
     const text = ctx.doc.getElementById('lookup-result').textContent;
     const addrEl = ctx.doc.querySelector('.owner-address');
     emit('ENS_NAME_SHOWN', String(text.includes('vitalik.eth')));
-    // Abbreviated so it stays on one line, with the full value on the element.
-    emit('ENS_SHOWS_SHORT_ADDRESS', String(!!addrEl && /^0x1111\.\.\./.test(addrEl.textContent)));
-    emit('ENS_KEEPS_FULL_ADDRESS', String(!!addrEl && addrEl.getAttribute('title') === EVM_ACCOUNT));
-    emit('ENS_ADDRESS_ONE_LINE', String(!!addrEl && !addrEl.textContent.includes('\n')
-        && addrEl.textContent.length < 20));
+    emit('ENS_KEEPS_FULL_ADDRESS', String(!!addrEl && addrEl.textContent === EVM_ACCOUNT));
+    emit('ENS_ADDRESS_NOT_ELLIPSISED', String(!!addrEl && !addrEl.textContent.includes('...')));
     emit('ENS_ERRORS', ctx.errors.length);
 }
 
@@ -445,7 +442,7 @@ const addressHidden = ctx => ctx.doc.getElementById('wallet-address').classList.
 {
     const ctx = await bootPage({withEvm: true, evmAuthorized: [EVM_ACCOUNT]});
     await new Promise(r => setTimeout(r, 500));
-    emit('RESTORE_EVM_SHOWS_ADDRESS', String(walletText(ctx).includes('0x1111')));
+    emit('RESTORE_EVM_SHOWS_ADDRESS', String(walletText(ctx) === EVM_ACCOUNT));
     emit('RESTORE_EVM_HIDES_CONNECT', String(connectHidden(ctx)));
     emit('RESTORE_EVM_USED_ETH_ACCOUNTS', String(ctx.captured.ethAccountsCalled === true));
     emit('RESTORE_EVM_DID_NOT_PROMPT', String(ctx.captured.promptedForAccounts !== true));
@@ -465,7 +462,7 @@ const addressHidden = ctx => ctx.doc.getElementById('wallet-address').classList.
 {
     const ctx = await bootPage({withSui: true, suiAuthorized: [SUI_ACCOUNT]});
     await new Promise(r => setTimeout(r, 500));
-    emit('RESTORE_SUI_SHOWS_ADDRESS', String(walletText(ctx).includes('Sui 0xceee')));
+    emit('RESTORE_SUI_SHOWS_ADDRESS', String(walletText(ctx) === 'Sui ' + SUI_ACCOUNT.address));
     emit('RESTORE_SUI_NO_SILENT_CALL_NEEDED', String(ctx.captured.silentConnectAttempted !== true));
     emit('RESTORE_SUI_DID_NOT_PROMPT', String(ctx.captured.promptedForSui !== true));
 }
@@ -496,7 +493,8 @@ const addressHidden = ctx => ctx.doc.getElementById('wallet-address').classList.
     await new Promise(r => setTimeout(r, 500));
     ctx.window.ethereum._emit('accountsChanged', ['0x9999999999999999999999999999999999999999']);
     await new Promise(r => setTimeout(r, 200));
-    emit('SWITCH_UPDATES_ADDRESS', String(walletText(ctx).includes('0x9999')));
+    emit('SWITCH_UPDATES_ADDRESS',
+        String(walletText(ctx) === '0x9999999999999999999999999999999999999999'));
 }
 
 // ============ ENS names for a stamp ============

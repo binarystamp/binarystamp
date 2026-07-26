@@ -8,7 +8,7 @@ BinaryStamp lets anyone register the SHA-256 hash of any file on a blockchain, c
 
 - **One Screen** — Drop a file: if it is claimed you see by whom and when, if not you can claim it
 - **Client-Side Hashing** — SHA-256 in the browser; the file itself is never uploaded
-- **Multi-Chain** — Stamp on Base (EVM), Sui, or both at once — signed by your own wallet
+- **On-chain** — Stamp on Base (EVM), Sui, or both at once — signed by your own wallet
 - **Walrus Storage** — Metadata stored on Walrus decentralized blob storage
 - **ENS Resolution** — Every stamp gets a real ENS name resolving to its owner via CCIP-Read
 - **The Graph Indexing** — All stamps indexed for instant lookups and history

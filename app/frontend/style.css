@@ -96,6 +96,7 @@ header {
     background: var(--bg-hover);
     padding: 6px 10px;
     border-radius: var(--radius);
+    overflow-wrap: anywhere;
 }
 
 main {
@@ -479,6 +480,8 @@ circle.spinner {
     .drop-zone { padding: 32px 16px; }
     .chain-options { flex-wrap: wrap; }
     .footer-inner { flex-direction: column; gap: 8px; }
+    /* Shrink rather than truncate: the whole address stays readable. */
+    .wallet-address { font-size: 10px; padding: 5px 8px; }
 }
 
 /* ============ Toast ============ */
@@ -684,5 +687,13 @@ circle.spinner {
     display: block;
     font-size: 11px;
     color: var(--text-muted);
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+}
+
+/* History rows carry an address and a date; keep them on separate lines. */
+.history-date {
+    display: block;
+    font-family: var(--font);
+    font-size: 11px;
+    color: var(--text-muted);
 }

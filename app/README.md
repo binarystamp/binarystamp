@@ -2,7 +2,7 @@
 
 ## Architecture Overview
 
-BinaryStamp is a multi-chain file provenance registry. Users hash files client-side and register the hash on-chain. The system spans EVM (Base), Sui, Walrus, ENS, and The Graph.
+BinaryStamp is a On-chain file provenance registry. Users hash files client-side and register the hash on-chain. The system spans EVM (Base), Sui, Walrus, ENS, and The Graph.
 
 ### Components
 
