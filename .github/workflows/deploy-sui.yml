@@ -19,50 +19,43 @@ jobs:
 
       - name: Configure Sui Client
         run: |
-          mkdir -p ~/.sui/sui_config
-
-          cat > ~/.sui/sui_config/sui.keystore <<'EOF'
-          []
-          EOF
-
-          cat > ~/.sui/sui_config/client.yaml <<'EOF'
-          ---
+          SUICONFIG="$HOME/.sui/sui_config"
+          mkdir -p "$SUICONFIG"
+          echo '[]' > "$SUICONFIG/sui.keystore"
+          echo "---
           keystore:
-            File: /home/runner/.sui/sui_config/sui.keystore
+            File: $SUICONFIG/sui.keystore
           envs:
             - alias: testnet
-              rpc: "https://fullnode.testnet.sui.io:443"
+              rpc: \"https://fullnode.testnet.sui.io:443\"
           active_env: testnet
-          active_address: ~
-          EOF
-
+          active_address: ~" | sed 's/^          //' > "$SUICONFIG/client.yaml"
+          cat "$SUICONFIG/client.yaml"
           sui keytool import "${{ secrets.SUI_PRIVATE_KEY_TESTNET }}" ed25519
-          echo "Imported key"
           sui client envs
           sui client active-address
 
       - name: Build Move Package
         run: |
           cd sui-package
-          sui move build 2>&1
+          sui move build
 
       - name: Publish to Sui Testnet
         run: |
           cd sui-package
-          sui client publish --gas-budget 200000000 --json 2>&1 | tee /tmp/publish-result.json
-
-          PACKAGE_ID=$(cat /tmp/publish-result.json | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
+          sui client publish --gas-budget 200000000 --json | tee /tmp/publish-result.json
+          python3 -c "
+          import json
+          data = json.load(open('/tmp/publish-result.json'))
           for obj in data.get('objectChanges', []):
               if obj.get('type') == 'published':
-                  print(obj['packageId'])
+                  pid = obj['packageId']
+                  print(f'PACKAGE_ID={pid}')
+                  open('/tmp/package-id.txt','w').write(pid)
                   break
-          " 2>/dev/null || echo "PARSE_FAILED")
-
+          "
           echo "## Sui Package Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "Package ID: \`$PACKAGE_ID\`" >> $GITHUB_STEP_SUMMARY
-          echo "PACKAGE_ID=$PACKAGE_ID"
+          echo "Package ID: $(cat /tmp/package-id.txt 2>/dev/null || echo UNKNOWN)" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Result
         if: always()
