@@ -5,23 +5,20 @@ module binarystamp::stamp {
 
     // ============ Structs ============
 
-    /// A registered stamp proving file existence/ownership
     public struct Stamp has key, store {
         id: UID,
-        file_hash: vector<u8>,       // SHA-256 hash of the file
-        metadata_hash: vector<u8>,   // Hash of metadata (or AI function spec)
-        walrus_blob_id: String,      // Walrus blob ID for metadata storage
+        file_hash: vector<u8>,
+        metadata_hash: vector<u8>,
+        walrus_blob_id: String,
         owner: address,
         timestamp_ms: u64,
         description: String,
     }
 
-    /// Registry mapping file hashes to stamp IDs (shared object)
     public struct Registry has key {
         id: UID,
     }
 
-    /// A record in the registry linking hash -> stamp info
     public struct StampRecord has key, store {
         id: UID,
         file_hash: vector<u8>,
@@ -41,7 +38,6 @@ module binarystamp::stamp {
         owner: address,
         timestamp_ms: u64,
         metadata_hash: vector<u8>,
-        walrus_blob_id: String,
     }
 
     public struct StampTransferred has copy, drop {
@@ -63,7 +59,6 @@ module binarystamp::stamp {
 
     // ============ Public Functions ============
 
-    /// Register a new file hash stamp
     public entry fun stamp(
         _registry: &mut Registry,
         file_hash: vector<u8>,
@@ -73,60 +68,68 @@ module binarystamp::stamp {
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
-        let sender = tx_context::sender(ctx);
+        let sender = ctx.sender();
         let now = clock.timestamp_ms();
         let stamp_uid = object::new(ctx);
-        let stamp_id = object::uid_to_inner(&stamp_uid);
+        let stamp_id = stamp_uid.to_inner();
+
+        // Copy values needed for event and record
+        let fh_event = file_hash;
+        let mh_event = metadata_hash;
+        let fh_record = file_hash;
+        let mh_record = metadata_hash;
+
+        event::emit(StampCreated {
+            stamp_id,
+            file_hash: fh_event,
+            owner: sender,
+            timestamp_ms: now,
+            metadata_hash: mh_event,
+        });
 
         let new_stamp = Stamp {
             id: stamp_uid,
-            file_hash: file_hash,
-            metadata_hash: metadata_hash,
-            walrus_blob_id: walrus_blob_id,
+            file_hash,
+            metadata_hash,
+            walrus_blob_id,
             owner: sender,
             timestamp_ms: now,
-            description: description,
+            description,
         };
 
-        // Create a shared record for lookups
-        let record = StampRecord {
-            id: object::new(ctx),
-            file_hash: file_hash,
-            stamp_id: stamp_id,
-            owner: sender,
-            timestamp_ms: now,
-            metadata_hash: metadata_hash,
-            walrus_blob_id: walrus_blob_id,
-            description: description,
-        };
-
-        event::emit(StampCreated {
-            stamp_id: stamp_id,
-            file_hash: file_hash,
-            owner: sender,
-            timestamp_ms: now,
-            metadata_hash: metadata_hash,
-            walrus_blob_id: walrus_blob_id,
-        });
+        // Copy values for the record before they move into the stamp
+        let wid_record = new_stamp.walrus_blob_id;
+        let desc_record = new_stamp.description;
 
         transfer::transfer(new_stamp, sender);
+
+        let record = StampRecord {
+            id: object::new(ctx),
+            file_hash: fh_record,
+            stamp_id,
+            owner: sender,
+            timestamp_ms: now,
+            metadata_hash: mh_record,
+            walrus_blob_id: wid_record,
+            description: desc_record,
+        };
+
         transfer::share_object(record);
     }
 
-    /// Transfer stamp ownership
     public entry fun transfer_stamp(
         stamp: &mut Stamp,
         new_owner: address,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
-        let sender = tx_context::sender(ctx);
+        let sender = ctx.sender();
         assert!(stamp.owner == sender, 0);
 
         let now = clock.timestamp_ms();
 
         event::emit(StampTransferred {
-            stamp_id: object::uid_to_inner(&stamp.id),
+            stamp_id: stamp.id.to_inner(),
             file_hash: stamp.file_hash,
             from: sender,
             to: new_owner,
@@ -142,5 +145,4 @@ module binarystamp::stamp {
     public fun get_file_hash(stamp: &Stamp): vector<u8> { stamp.file_hash }
     public fun get_metadata_hash(stamp: &Stamp): vector<u8> { stamp.metadata_hash }
     public fun get_timestamp(stamp: &Stamp): u64 { stamp.timestamp_ms }
-    public fun get_walrus_blob_id(stamp: &Stamp): String { stamp.walrus_blob_id }
 }

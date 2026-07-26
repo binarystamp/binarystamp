@@ -20,45 +20,52 @@ jobs:
       - name: Configure Sui Client
         run: |
           mkdir -p ~/.sui/sui_config
-          cat > ~/.sui/sui_config/client.yaml << 'YAML'
+
+          cat > ~/.sui/sui_config/sui.keystore <<'EOF'
+          []
+          EOF
+
+          cat > ~/.sui/sui_config/client.yaml <<'EOF'
           ---
           keystore:
-            File: ~/.sui/sui_config/sui.keystore
+            File: /home/runner/.sui/sui_config/sui.keystore
           envs:
             - alias: testnet
               rpc: "https://fullnode.testnet.sui.io:443"
           active_env: testnet
-          YAML
-          echo '[]' > ~/.sui/sui_config/sui.keystore
+          active_address: ~
+          EOF
+
           sui keytool import "${{ secrets.SUI_PRIVATE_KEY_TESTNET }}" ed25519
-          sui client switch --env testnet
+          echo "Imported key"
+          sui client envs
+          sui client active-address
 
       - name: Build Move Package
         run: |
           cd sui-package
-          sui move build
+          sui move build 2>&1
 
       - name: Publish to Sui Testnet
         run: |
           cd sui-package
-          RESULT=$(sui client publish --gas-budget 100000000 --json 2>&1)
-          echo "$RESULT"
-          echo "$RESULT" > /tmp/publish-result.json
+          sui client publish --gas-budget 200000000 --json 2>&1 | tee /tmp/publish-result.json
 
-          # Extract package ID
-          PACKAGE_ID=$(echo "$RESULT" | python3 -c "
+          PACKAGE_ID=$(cat /tmp/publish-result.json | python3 -c "
           import sys, json
           data = json.load(sys.stdin)
           for obj in data.get('objectChanges', []):
               if obj.get('type') == 'published':
                   print(obj['packageId'])
                   break
-          ")
-          echo "PACKAGE_ID=$PACKAGE_ID" >> $GITHUB_ENV
+          " 2>/dev/null || echo "PARSE_FAILED")
+
           echo "## Sui Package Deployed" >> $GITHUB_STEP_SUMMARY
           echo "Package ID: \`$PACKAGE_ID\`" >> $GITHUB_STEP_SUMMARY
+          echo "PACKAGE_ID=$PACKAGE_ID"
 
       - name: Upload Result
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sui-publish-result
