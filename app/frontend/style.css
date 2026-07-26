@@ -612,10 +612,13 @@ circle.spinner {
 
 .owner-name {
     display: block;
+    font-family: var(--font);
+    font-size: 13px;
 }
 
 .owner-address {
     display: block;
     font-size: 11px;
     color: var(--text-muted);
+    white-space: nowrap;
 }

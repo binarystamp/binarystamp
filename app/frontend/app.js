@@ -511,8 +511,11 @@ async function fillOwnerName(slotId, address) {
     const el = document.getElementById(slotId);
     if (!el) return;  // the result was replaced while we were waiting
 
+    // The name is now the identity, so the address drops to corroboration:
+    // abbreviated to stay on one line, full value on hover and in the title.
     el.innerHTML = '<span class="owner-name">' + escapeHtml(name) + '</span>'
-        + '<span class="owner-address">' + escapeHtml(address) + '</span>';
+        + '<span class="owner-address" title="' + escapeHtml(address) + '">'
+        + escapeHtml(shortAddress(address)) + '</span>';
 }
 
 // ============ Lookup ============

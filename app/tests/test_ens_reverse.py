@@ -85,6 +85,35 @@ def test_unconfigured_mainnet_raises(monkeypatch):
 
 # ============ Caching ============
 
+def test_hits_and_misses_use_different_ttls(monkeypatch):
+    """A miss may only mean the network blipped, so it must not stick for an hour."""
+    monkeypatch.setattr(ens_resolver, 'REVERSE_CACHE_TTL', 3600)
+    monkeypatch.setattr(ens_resolver, 'REVERSE_MISS_TTL', 300)
+    install_fake(monkeypatch, {VITALIK.lower(): 'vitalik.eth'})
+
+    ens_resolver.reverse_ens(VITALIK)
+    ens_resolver.reverse_ens(NO_NAME)
+
+    hit_expiry = ens_resolver._reverse_cache[VITALIK.lower()][1]
+    miss_expiry = ens_resolver._reverse_cache[NO_NAME.lower()][1]
+    assert hit_expiry - miss_expiry > 3000
+
+
+def test_a_miss_is_retried_once_it_expires(monkeypatch):
+    """The failure mode this guards: a name that briefly failed to verify."""
+    names = {}
+    calls = install_fake(monkeypatch, names)
+
+    assert ens_resolver.reverse_ens(VITALIK) is None      # transient miss
+
+    ens_resolver._reverse_cache[VITALIK.lower()] = (None, 0)   # expire it
+    names[VITALIK.lower()] = 'vitalik.eth'                     # network recovers
+
+    assert ens_resolver.reverse_ens(VITALIK) == 'vitalik.eth'
+    assert len(calls) == 2
+
+
+
 def test_second_lookup_is_cached(monkeypatch):
     calls = install_fake(monkeypatch, {VITALIK.lower(): 'vitalik.eth'})
     ens_resolver.reverse_ens(VITALIK)

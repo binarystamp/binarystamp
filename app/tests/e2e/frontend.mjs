@@ -384,8 +384,13 @@ async function transfer(ctx, newOwner) {
     await dropFile(ctx, 'drop-zone');
     await new Promise(r => setTimeout(r, 600));
     const text = ctx.doc.getElementById('lookup-result').textContent;
+    const addrEl = ctx.doc.querySelector('.owner-address');
     emit('ENS_NAME_SHOWN', String(text.includes('vitalik.eth')));
-    emit('ENS_KEEPS_ADDRESS', String(text.includes(EVM_ACCOUNT)));
+    // Abbreviated so it stays on one line, with the full value on the element.
+    emit('ENS_SHOWS_SHORT_ADDRESS', String(!!addrEl && /^0x1111\.\.\./.test(addrEl.textContent)));
+    emit('ENS_KEEPS_FULL_ADDRESS', String(!!addrEl && addrEl.getAttribute('title') === EVM_ACCOUNT));
+    emit('ENS_ADDRESS_ONE_LINE', String(!!addrEl && !addrEl.textContent.includes('\n')
+        && addrEl.textContent.length < 20));
     emit('ENS_ERRORS', ctx.errors.length);
 }
 

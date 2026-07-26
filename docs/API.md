@@ -284,8 +284,12 @@ the same reason.
 
 Reverse records live on Ethereum mainnet, so this needs `MAINNET_RPC_URL`
 (`503` without it) and does not apply to Sui addresses (`400` — they are 32
-bytes). Results are cached for `ENS_REVERSE_CACHE_TTL` seconds, misses
-included, since each lookup costs two mainnet calls.
+bytes).
+
+Each lookup costs two mainnet calls, so results are cached. Hits are held for
+`ENS_REVERSE_CACHE_TTL`; misses only for `ENS_REVERSE_MISS_TTL`, because
+`null` is returned both when an address has no name and when the forward check
+happens to fail — caching the latter for an hour would hide a real name.
 
 ### `POST /api/ens/resolve` — also served at `POST /api/ens`
 

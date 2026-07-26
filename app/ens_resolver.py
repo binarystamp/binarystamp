@@ -29,6 +29,11 @@ SUBGRAPH_URL = os.getenv('SUBGRAPH_URL', '')
 # mainnet, not on Base, so it needs its own provider.
 MAINNET_RPC_URL = os.getenv('MAINNET_RPC_URL', '')
 REVERSE_CACHE_TTL = int(os.getenv('ENS_REVERSE_CACHE_TTL', '3600'))
+# Misses expire far sooner than hits. web3's ens.name() returns None both when
+# an address genuinely has no name and when the forward check it runs happens
+# to fail, so a transient RPC blip is indistinguishable from "no record" — and
+# caching that for an hour makes a real name vanish for an hour.
+REVERSE_MISS_TTL = int(os.getenv('ENS_REVERSE_MISS_TTL', '300'))
 
 EVM_ADDRESS = re.compile(r'^0x[0-9a-fA-F]{40}$')
 
@@ -174,7 +179,8 @@ def reverse_ens(address):
     vitalik.eth.
 
     Results are cached, misses included, because a lookup costs two mainnet
-    calls and most addresses have no name at all.
+    calls and most addresses have no name at all — but misses expire much
+    sooner, since one may only mean the network was briefly unhappy.
     """
     key = address.lower()
     cached = _reverse_cache.get(key)
@@ -188,7 +194,8 @@ def reverse_ens(address):
     from web3 import Web3
     name = w3.ens.name(Web3.to_checksum_address(address))
 
-    _reverse_cache[key] = (name, time.time() + REVERSE_CACHE_TTL)
+    ttl = REVERSE_CACHE_TTL if name else REVERSE_MISS_TTL
+    _reverse_cache[key] = (name, time.time() + ttl)
     return name
 
 

@@ -90,7 +90,8 @@ Copy `.env.example` to `.env` and fill in:
 | `WALRUS_PUBLISHER` | Walrus publisher URL |
 | `ANTHROPIC_API_KEY` | Claude API key for AI agent |
 | `MAINNET_RPC_URL` | Ethereum mainnet RPC — ENS resolver deploys and reverse lookups |
-| `ENS_REVERSE_CACHE_TTL` | Seconds to cache an ENS reverse lookup (default 3600) |
+| `ENS_REVERSE_CACHE_TTL` | Seconds to cache a successful ENS reverse lookup (default 3600) |
+| `ENS_REVERSE_MISS_TTL` | Seconds to cache a reverse-lookup miss (default 300) |
 | `MAINNET_PRIVATE_KEY` | Mainnet wallet (for ENS resolver deployment) |
 | `SUI_RPC` | Sui JSON-RPC endpoint |
 | `SUI_PACKAGE_ID` | Published Sui Move package |
