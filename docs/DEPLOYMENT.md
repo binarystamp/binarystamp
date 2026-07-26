@@ -28,10 +28,14 @@ stopped, and health-checks `/api/health`. Put a TLS-terminating reverse proxy
 in front of it.
 
 `_start` uses the Compose v2 plugin (`docker compose`) when present and falls
-back to the standalone v1 binary (`docker-compose`). The file keeps its
-`version:` key because v1 needs it — without one, v1 reads the file in its
-legacy format, treats `services` as a service name, and fails with
-*"Unsupported config option for services"*. Compose v2 ignores the key.
+back to the standalone v1 binary (`docker-compose`).
+
+The file declares `version: "3.3"`. v1 requires a version key — without one it
+reads the file in its legacy format, treats `services` as a service name and
+fails with *"Unsupported config option for services"*. The value is 3.3 rather
+than something newer because older v1 builds reject anything above it, and
+nothing here needs more: the only feature above the 1.0 schema is
+`healthcheck`, which arrived in 2.1. Compose v2 ignores the key entirely.
 
 `app/.dockerignore` keeps the build context at roughly a third of a megabyte.
 Without it `COPY . .` ships `venv/` and every `node_modules/`, around 436MB —
