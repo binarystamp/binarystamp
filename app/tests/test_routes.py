@@ -62,6 +62,7 @@ def test_no_duplicate_rules_anywhere():
     ('/api/sui/config', 'GET'),
     ('/api/ens/resolve', 'POST'),
     ('/api/ens/resolve/<name>', 'GET'),
+    ('/api/ens/reverse/<address>', 'GET'),
     ('/api/subgraph/query', 'POST'),
     ('/api/ai/provenance', 'POST'),
     ('/api/walrus/store', 'POST'),

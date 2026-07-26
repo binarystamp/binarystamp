@@ -67,6 +67,8 @@ that feature is unconfigured, not that it is broken.
 | `SUI_PACKAGE_ID` | for Sui | Published Move package |
 | `SUI_REGISTRY_ID` | for Sui | Shared `Registry` object from the same publish |
 | `SUI_EVENT_PAGE_SIZE`, `SUI_EVENT_MAX_PAGES` | no | Bound the Sui event scan (50 / 10) |
+| `MAINNET_RPC_URL` | recommended | Reverse-resolves owner addresses to ENS names; without it owners show as plain addresses |
+| `ENS_REVERSE_CACHE_TTL` | no | Seconds to cache a reverse lookup, hits and misses (3600) |
 | `ENS_GATEWAY_URL` | no | Read by `deploy_resolver.py` only, not by the app |
 | `ANTHROPIC_API_KEY` | no | Without it the AI agent returns data without prose |
 | `LOG_LEVEL` | no | `debug`, `info`, `warning`, `error` |

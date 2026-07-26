@@ -246,6 +246,32 @@ def test_pasted_hash_behaves_like_a_dropped_file(results):
     assert results['PASTED_HASH_OFFERS_CLAIM'] == 'true'
 
 
+# ============ Owner ENS name ============
+
+def test_owner_ens_name_is_shown(results):
+    assert results['ENS_NAME_SHOWN'] == 'true'
+
+
+def test_owner_address_stays_visible_alongside_name(results):
+    """A reverse record is a claim by its own owner, so keep the address."""
+    assert results['ENS_KEEPS_ADDRESS'] == 'true'
+
+
+def test_ens_lookup_causes_no_errors(results):
+    assert results['ENS_ERRORS'] == '0'
+
+
+def test_owner_without_ens_name_shows_address(results):
+    assert results['NO_ENS_SHOWS_ADDRESS'] == 'true'
+    assert results['NO_ENS_NO_STRAY_DOT_ETH'] == 'true'
+
+
+def test_sui_owner_skips_ens_lookup(results):
+    """ENS is Ethereum-only; a 32-byte Sui address has no reverse record."""
+    assert results['SUI_OWNER_NO_ENS_CALL'] == 'true'
+    assert results['SUI_OWNER_SHOWS_ADDRESS'] == 'true'
+
+
 # ============ Failure honesty ============
 
 def test_missing_wallet_reports_error(results):

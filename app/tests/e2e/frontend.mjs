@@ -54,7 +54,7 @@ function makeEvmProvider(captured) {
     };
 }
 
-async function bootPage({withSui, withEvm, lookup, ownedStamp}) {
+async function bootPage({withSui, withEvm, lookup, ownedStamp, ensName}) {
     const html = fs.readFileSync(path.join(FRONTEND, 'index.html'), 'utf8')
         .replace(/<script type="module"[^>]*><\/script>/, '');
 
@@ -76,6 +76,9 @@ async function bootPage({withSui, withEvm, lookup, ownedStamp}) {
         }
         if (target.includes('/api/sui/stamp-object')) {
             return {ok: true, json: async () => ownedStamp || {found: false}};
+        }
+        if (target.includes('/api/ens/reverse/')) {
+            return {ok: true, json: async () => ({name: ensName || null})};
         }
         return {ok: true, json: async () => ({})};
     };
@@ -342,6 +345,54 @@ async function transfer(ctx, newOwner) {
     await verify(ctx, FILE_HASH);
     emit('PASTED_HASH_SHOWS_HASH', ctx.doc.getElementById('file-hash').textContent);
     emit('PASTED_HASH_OFFERS_CLAIM', String(!ctx.doc.getElementById('claim-panel').classList.contains('hidden')));
+}
+
+// ============ Owner ENS name ============
+
+// An owner with a primary name shows it, keeping the address visible.
+{
+    const ctx = await bootPage({
+        lookup: {found: true, owner: EVM_ACCOUNT, timestamp: 1700000000, source: 'subgraph'},
+        ensName: 'vitalik.eth',
+    });
+    await dropFile(ctx, 'drop-zone');
+    await new Promise(r => setTimeout(r, 600));
+    const text = ctx.doc.getElementById('lookup-result').textContent;
+    emit('ENS_NAME_SHOWN', String(text.includes('vitalik.eth')));
+    emit('ENS_KEEPS_ADDRESS', String(text.includes(EVM_ACCOUNT)));
+    emit('ENS_ERRORS', ctx.errors.length);
+}
+
+// No primary name: the address stands alone, nothing invented.
+{
+    const ctx = await bootPage({
+        lookup: {found: true, owner: EVM_ACCOUNT, timestamp: 1700000000, source: 'subgraph'},
+        ensName: null,
+    });
+    await dropFile(ctx, 'drop-zone');
+    await new Promise(r => setTimeout(r, 600));
+    const text = ctx.doc.getElementById('lookup-result').textContent;
+    emit('NO_ENS_SHOWS_ADDRESS', String(text.includes(EVM_ACCOUNT)));
+    emit('NO_ENS_NO_STRAY_DOT_ETH', String(!/\.eth/.test(text)));
+}
+
+// A Sui owner must not trigger an Ethereum-only lookup at all.
+{
+    const reverseCalls = [];
+    const ctx = await bootPage({
+        lookup: {found: true, owner: SUI_ACCOUNT.address, timestamp: 1700000000, source: 'sui'},
+        ensName: 'should-never-appear.eth',
+    });
+    const originalFetch = ctx.window.fetch;
+    ctx.window.fetch = (u, o) => {
+        if (String(u).includes('/api/ens/reverse/')) reverseCalls.push(String(u));
+        return originalFetch(u, o);
+    };
+    await dropFile(ctx, 'drop-zone');
+    await new Promise(r => setTimeout(r, 600));
+    const text = ctx.doc.getElementById('lookup-result').textContent;
+    emit('SUI_OWNER_NO_ENS_CALL', String(reverseCalls.length === 0));
+    emit('SUI_OWNER_SHOWS_ADDRESS', String(text.includes(SUI_ACCOUNT.address)));
 }
 
 console.log(out.join('\n'));

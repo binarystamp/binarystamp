@@ -567,3 +567,15 @@ input[type="checkbox"] {
     border-top: 1px solid var(--border-light);
     margin: 12px 0;
 }
+
+/* ============ Owner with ENS name ============ */
+
+.owner-name {
+    display: block;
+}
+
+.owner-address {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+}

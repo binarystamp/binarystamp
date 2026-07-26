@@ -13,6 +13,8 @@ import os
 import json
 import hashlib
 import logging
+import re
+import time
 from flask import Blueprint, request, jsonify
 from eth_abi import encode, decode
 from eth_utils import keccak
@@ -22,6 +24,16 @@ log = logging.getLogger('binarystamp.ens')
 ens_bp = Blueprint('ens', __name__)
 
 SUBGRAPH_URL = os.getenv('SUBGRAPH_URL', '')
+
+# Reverse resolution ("what name does this address claim?") lives on Ethereum
+# mainnet, not on Base, so it needs its own provider.
+MAINNET_RPC_URL = os.getenv('MAINNET_RPC_URL', '')
+REVERSE_CACHE_TTL = int(os.getenv('ENS_REVERSE_CACHE_TTL', '3600'))
+
+EVM_ADDRESS = re.compile(r'^0x[0-9a-fA-F]{40}$')
+
+_mainnet = None
+_reverse_cache = {}  # lowercased address -> (name or None, expires_at)
 
 # EIP-3668 CCIP-Read interface
 # The resolver contract calls this gateway with encoded calldata
@@ -127,6 +139,63 @@ def resolve_name(name):
         })
 
     return jsonify({'resolved': False, 'name': name})
+
+
+def mainnet_web3():
+    """Lazily connect to Ethereum mainnet for reverse resolution."""
+    global _mainnet
+    if _mainnet is None:
+        if not MAINNET_RPC_URL:
+            return None
+        from web3 import Web3
+        _mainnet = Web3(Web3.HTTPProvider(MAINNET_RPC_URL, request_kwargs={'timeout': 15}))
+    return _mainnet
+
+
+def reverse_ens(address):
+    """Primary ENS name for an address, or None.
+
+    web3's ens.name() forward-resolves the candidate name and discards it
+    unless it points back at the same address. That check matters: a reverse
+    record is set by its own owner, so without it anyone could claim to be
+    vitalik.eth.
+
+    Results are cached, misses included, because a lookup costs two mainnet
+    calls and most addresses have no name at all.
+    """
+    key = address.lower()
+    cached = _reverse_cache.get(key)
+    if cached and cached[1] > time.time():
+        return cached[0]
+
+    w3 = mainnet_web3()
+    if w3 is None:
+        raise RuntimeError('MAINNET_RPC_URL is not configured')
+
+    from web3 import Web3
+    name = w3.ens.name(Web3.to_checksum_address(address))
+
+    _reverse_cache[key] = (name, time.time() + REVERSE_CACHE_TTL)
+    return name
+
+
+@ens_bp.route('/ens/reverse/<address>', methods=['GET'])
+def reverse_lookup(address):
+    """Resolve an address to its primary ENS name, if it has set one."""
+    if not EVM_ADDRESS.match(address):
+        return jsonify({'error': 'Expected a 20-byte EVM address'}), 400
+
+    if not MAINNET_RPC_URL:
+        return jsonify({'address': address, 'name': None,
+                        'error': 'Mainnet RPC not configured'}), 503
+
+    try:
+        name = reverse_ens(address)
+    except Exception as e:
+        log.error(f'Reverse ENS lookup failed for {address}: {e}')
+        return jsonify({'address': address, 'name': None, 'error': str(e)}), 502
+
+    return jsonify({'address': address, 'name': name})
 
 
 def decode_dns_name(data):

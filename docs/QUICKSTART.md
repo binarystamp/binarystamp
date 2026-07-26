@@ -28,6 +28,7 @@ as-is for local use. Two values are blank and worth filling in:
 | Variable | Why |
 |----------|-----|
 | `SUBGRAPH_URL` | Without it, lookups fall back to reading the contract directly — slower, and no stamp history |
+| `MAINNET_RPC_URL` | Without it, owners show as plain addresses instead of their ENS names |
 | `ANTHROPIC_API_KEY` | Without it, the AI agent returns structured data instead of prose |
 
 Leave `PRIVATE_KEY` empty. It only enables server-side stamping, which
@@ -67,6 +68,11 @@ There is a single screen, and what it offers depends on what it finds.
 You see who owns it, when it was stamped, which chain it lives on, and any
 description or Walrus metadata attached to it. If ownership has moved since,
 that is noted too.
+
+If the owner has set a primary ENS name it is shown above their address —
+`vitalik.eth` rather than `0xd8dA…6045`. The address stays visible, because a
+reverse record is set by whoever controls the address and is a claim rather
+than proof. This needs `MAINNET_RPC_URL`, and applies to Base owners only.
 
 Two things appear below the result:
 

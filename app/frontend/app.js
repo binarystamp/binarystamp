@@ -414,6 +414,53 @@ function showTransferResult(el, success, data) {
         + '</div>';
 }
 
+// ============ Owner display ============
+
+// ENS reverse records are opt-in, so most addresses have none. Render the
+// address immediately and let the name arrive late if there is one — a slow
+// or failing mainnet lookup must never hold up or break the result.
+
+const ensNameCache = new Map();
+let ownerSlotSeq = 0;
+
+function ownerSlot(address) {
+    if (!address) return 'unknown';
+    const id = 'owner-slot-' + (++ownerSlotSeq);
+    // Resolve after this HTML has been written into the document.
+    setTimeout(() => fillOwnerName(id, address), 0);
+    return '<span id="' + id + '">' + escapeHtml(address) + '</span>';
+}
+
+async function lookupEnsName(address) {
+    const key = address.toLowerCase();
+    if (ensNameCache.has(key)) return ensNameCache.get(key);
+
+    let name = null;
+    try {
+        const resp = await fetch(API + '/api/ens/reverse/' + encodeURIComponent(address));
+        if (resp.ok) name = (await resp.json()).name || null;
+    } catch (e) {
+        console.warn('ENS reverse lookup failed:', e);
+    }
+
+    ensNameCache.set(key, name);
+    return name;
+}
+
+async function fillOwnerName(slotId, address) {
+    // ENS is Ethereum-only; Sui addresses are 32 bytes and have no reverse record.
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return;
+
+    const name = await lookupEnsName(address);
+    if (!name) return;
+
+    const el = document.getElementById(slotId);
+    if (!el) return;  // the result was replaced while we were waiting
+
+    el.innerHTML = '<span class="owner-name">' + escapeHtml(name) + '</span>'
+        + '<span class="owner-address">' + escapeHtml(address) + '</span>';
+}
+
 // ============ Lookup ============
 
 // Entry point for the pasted-hash / ENS input.
@@ -514,7 +561,7 @@ function showLookupResult(data, hash) {
 
     let html = '<div class="result-success">';
     html += row('Status', '&#10003; Stamped', 'color:var(--success)');
-    html += row('Owner', escapeHtml(data.owner || 'unknown'));
+    html += row('Owner', ownerSlot(data.owner));
 
     const ts = data.timestamp || data.firstStampedAt;
     if (ts) html += row('Stamped', escapeHtml(new Date(parseInt(ts) * 1000).toLocaleString()));
@@ -563,7 +610,7 @@ function showEnsResult(data, name) {
     let html = '<div class="result-success">';
     html += row('Status', '&#10003; Resolved', 'color:var(--success)');
     html += row('Name', escapeHtml(data.name || name));
-    html += row('Owner', escapeHtml(data.owner || 'unknown'));
+    html += row('Owner', ownerSlot(data.owner));
     if (data.description) html += row('Notes', escapeHtml(data.description));
     if (data.walrusBlobId) html += row('Metadata', escapeHtml(data.walrusBlobId));
     html += '</div>';
@@ -584,7 +631,7 @@ function showClaimedPending(result, description, walrusBlobId) {
 
     let html = '<div class="result-success">';
     html += row('Status', '&#10003; Stamped &mdash; awaiting confirmation', 'color:var(--success)');
-    if (owner) html += row('Owner', escapeHtml(owner));
+    if (owner) html += row('Owner', ownerSlot(owner));
     html += row('Chain', escapeHtml(CHAIN_LABELS[result.chain] || result.chain));
     if (description) html += row('Notes', escapeHtml(description));
     if (walrusBlobId) html += row('Metadata', escapeHtml(walrusBlobId));

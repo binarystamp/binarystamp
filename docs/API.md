@@ -246,6 +246,28 @@ Direct lookup, used by the browser UI.
 
 Unresolved: `{"resolved": false, "name": "<name>"}`.
 
+### `GET /api/ens/reverse/<address>`
+
+The reverse direction: an address's **primary ENS name**, if it has set one.
+Used to show `vitalik.eth` next to an owner address.
+
+```json
+{"address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "name": "vitalik.eth"}
+```
+
+`name` is `null` when the address has no primary name — which is the common
+case, since reverse records are opt-in.
+
+A reverse record is set by whoever controls the address, so on its own it is a
+claim rather than proof. The name is only returned if resolving it forward
+lands back on the same address; the UI shows the address alongside the name for
+the same reason.
+
+Reverse records live on Ethereum mainnet, so this needs `MAINNET_RPC_URL`
+(`503` without it) and does not apply to Sui addresses (`400` — they are 32
+bytes). Results are cached for `ENS_REVERSE_CACHE_TTL` seconds, misses
+included, since each lookup costs two mainnet calls.
+
 ### `POST /api/ens/resolve`
 
 The CCIP-Read gateway itself. Called by the resolver contract on Ethereum

@@ -89,7 +89,8 @@ Copy `.env.example` to `.env` and fill in:
 | `WALRUS_AGGREGATOR` | Walrus aggregator URL |
 | `WALRUS_PUBLISHER` | Walrus publisher URL |
 | `ANTHROPIC_API_KEY` | Claude API key for AI agent |
-| `MAINNET_RPC_URL` | Ethereum mainnet RPC (for ENS resolver) |
+| `MAINNET_RPC_URL` | Ethereum mainnet RPC — ENS resolver deploys and reverse lookups |
+| `ENS_REVERSE_CACHE_TTL` | Seconds to cache an ENS reverse lookup (default 3600) |
 | `MAINNET_PRIVATE_KEY` | Mainnet wallet (for ENS resolver deployment) |
 | `SUI_RPC` | Sui JSON-RPC endpoint |
 | `SUI_PACKAGE_ID` | Published Sui Move package |
@@ -127,6 +128,7 @@ Copy `.env.example` to `.env` and fill in:
 | `POST` | `/api/subgraph/query` | Proxy GraphQL to The Graph |
 | `POST` | `/api/ai/provenance` | AI provenance analysis |
 | `GET` | `/api/ens/resolve/<name>` | Resolve ENS subdomain |
+| `GET` | `/api/ens/reverse/<address>` | Primary ENS name for an address |
 | `POST` | `/api/ens/resolve` | CCIP-Read gateway endpoint |
 
 ## Smart Contracts
