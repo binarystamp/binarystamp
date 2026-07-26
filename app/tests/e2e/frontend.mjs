@@ -24,12 +24,24 @@ function emit(key, value) {
     out.push(key + '=' + value);
 }
 
-function makeSuiWallet(captured) {
+function makeSuiWallet(captured, opts = {}) {
     return {
         name: 'Mock Sui Wallet',
-        accounts: [SUI_ACCOUNT],
+        // Wallet Standard exposes already-authorized accounts here.
+        accounts: opts.authorized || [],
         features: {
-            'standard:connect': {connect: async () => ({accounts: [SUI_ACCOUNT]})},
+            'standard:connect': {
+                version: opts.connectVersion || '1.1.0',
+                connect: async (input) => {
+                    if (input && input.silent) {
+                        captured.silentConnectAttempted = true;
+                        if (!(opts.authorized || []).length) throw new Error('not authorized');
+                        return {accounts: opts.authorized};
+                    }
+                    captured.promptedForSui = true;
+                    return {accounts: [SUI_ACCOUNT]};
+                },
+            },
             'sui:signAndExecuteTransaction': {
                 signAndExecuteTransaction: async (input) => {
                     captured.sui = input;
@@ -40,10 +52,22 @@ function makeSuiWallet(captured) {
     };
 }
 
-function makeEvmProvider(captured) {
+function makeEvmProvider(captured, opts = {}) {
+    const handlers = {};
     return {
+        // Already-authorized accounts; empty unless the test says otherwise.
+        _authorized: opts.authorized || [],
+        on: (event, fn) => { handlers[event] = fn; },
+        _emit: (event, payload) => handlers[event] && handlers[event](payload),
         request: async ({method, params}) => {
-            if (method === 'eth_requestAccounts') return [EVM_ACCOUNT];
+            if (method === 'eth_accounts') {
+                captured.ethAccountsCalled = true;
+                return opts.authorized || [];
+            }
+            if (method === 'eth_requestAccounts') {
+                captured.promptedForAccounts = true;
+                return [EVM_ACCOUNT];
+            }
             if (method === 'eth_chainId') return '0x14a34';
             if (method === 'eth_sendTransaction') {
                 captured.evm = params[0];
@@ -54,7 +78,8 @@ function makeEvmProvider(captured) {
     };
 }
 
-async function bootPage({withSui, withEvm, lookup, ownedStamp, ensName}) {
+async function bootPage({withSui, withEvm, lookup, ownedStamp, ensName,
+                         evmAuthorized, suiAuthorized, suiConnectVersion}) {
     const html = fs.readFileSync(path.join(FRONTEND, 'index.html'), 'utf8')
         .replace(/<script type="module"[^>]*><\/script>/, '');
 
@@ -85,10 +110,11 @@ async function bootPage({withSui, withEvm, lookup, ownedStamp, ensName}) {
 
     const captured = {};
     if (withSui) {
-        w.addEventListener('wallet-standard:app-ready', e => e.detail.register(makeSuiWallet(captured)));
+        w.addEventListener('wallet-standard:app-ready', e => e.detail.register(
+            makeSuiWallet(captured, {authorized: suiAuthorized, connectVersion: suiConnectVersion})));
     }
     if (withEvm) {
-        w.ethereum = makeEvmProvider(captured);
+        w.ethereum = makeEvmProvider(captured, {authorized: evmAuthorized});
     }
 
     const script = w.document.createElement('script');
@@ -393,6 +419,70 @@ async function transfer(ctx, newOwner) {
     const text = ctx.doc.getElementById('lookup-result').textContent;
     emit('SUI_OWNER_NO_ENS_CALL', String(reverseCalls.length === 0));
     emit('SUI_OWNER_SHOWS_ADDRESS', String(text.includes(SUI_ACCOUNT.address)));
+}
+
+// ============ Wallet restore on page load ============
+
+const walletText = ctx => ctx.doc.getElementById('wallet-address').textContent;
+const connectHidden = ctx => ctx.doc.getElementById('btn-connect').classList.contains('hidden');
+const addressHidden = ctx => ctx.doc.getElementById('wallet-address').classList.contains('hidden');
+
+// An already-authorized EVM wallet shows without the user clicking Connect.
+{
+    const ctx = await bootPage({withEvm: true, evmAuthorized: [EVM_ACCOUNT]});
+    await new Promise(r => setTimeout(r, 500));
+    emit('RESTORE_EVM_SHOWS_ADDRESS', String(walletText(ctx).includes('0x1111')));
+    emit('RESTORE_EVM_HIDES_CONNECT', String(connectHidden(ctx)));
+    emit('RESTORE_EVM_USED_ETH_ACCOUNTS', String(ctx.captured.ethAccountsCalled === true));
+    emit('RESTORE_EVM_DID_NOT_PROMPT', String(ctx.captured.promptedForAccounts !== true));
+    emit('RESTORE_EVM_ERRORS', ctx.errors.length);
+}
+
+// Nothing authorized: Connect stays, and still no prompt on load.
+{
+    const ctx = await bootPage({withEvm: true, evmAuthorized: []});
+    await new Promise(r => setTimeout(r, 500));
+    emit('NO_AUTH_SHOWS_CONNECT', String(!connectHidden(ctx)));
+    emit('NO_AUTH_HIDES_ADDRESS', String(addressHidden(ctx)));
+    emit('NO_AUTH_DID_NOT_PROMPT', String(ctx.captured.promptedForAccounts !== true));
+}
+
+// A Sui wallet that already exposes accounts needs no call at all.
+{
+    const ctx = await bootPage({withSui: true, suiAuthorized: [SUI_ACCOUNT]});
+    await new Promise(r => setTimeout(r, 500));
+    emit('RESTORE_SUI_SHOWS_ADDRESS', String(walletText(ctx).includes('Sui 0xceee')));
+    emit('RESTORE_SUI_NO_SILENT_CALL_NEEDED', String(ctx.captured.silentConnectAttempted !== true));
+    emit('RESTORE_SUI_DID_NOT_PROMPT', String(ctx.captured.promptedForSui !== true));
+}
+
+// Silent connect is only attempted on wallets that declare support for it.
+{
+    const ctx = await bootPage({withSui: true, suiAuthorized: [], suiConnectVersion: '1.0.0'});
+    await new Promise(r => setTimeout(r, 500));
+    emit('OLD_WALLET_NO_SILENT_ATTEMPT', String(ctx.captured.silentConnectAttempted !== true));
+    emit('OLD_WALLET_DID_NOT_PROMPT', String(ctx.captured.promptedForSui !== true));
+}
+
+// Revoking the site from the wallet UI clears the header.
+{
+    const ctx = await bootPage({withEvm: true, evmAuthorized: [EVM_ACCOUNT]});
+    await new Promise(r => setTimeout(r, 500));
+    const before = walletText(ctx).includes('0x1111');
+    ctx.window.ethereum._emit('accountsChanged', []);
+    await new Promise(r => setTimeout(r, 200));
+    emit('REVOKE_WAS_CONNECTED', String(before));
+    emit('REVOKE_CLEARS_ADDRESS', String(addressHidden(ctx)));
+    emit('REVOKE_RESTORES_CONNECT', String(!connectHidden(ctx)));
+}
+
+// Switching accounts in the wallet updates the header.
+{
+    const ctx = await bootPage({withEvm: true, evmAuthorized: [EVM_ACCOUNT]});
+    await new Promise(r => setTimeout(r, 500));
+    ctx.window.ethereum._emit('accountsChanged', ['0x9999999999999999999999999999999999999999']);
+    await new Promise(r => setTimeout(r, 200));
+    emit('SWITCH_UPDATES_ADDRESS', String(walletText(ctx).includes('0x9999')));
 }
 
 console.log(out.join('\n'));

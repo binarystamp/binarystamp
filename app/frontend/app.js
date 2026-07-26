@@ -2,9 +2,14 @@
 
 import {
     connectEvmWallet,
+    restoreEvmWallet,
+    onEvmWalletReady,
+    watchEvmAccounts,
     stampOnEvm,
     transferOnEvm,
     connectSuiWallet,
+    restoreSuiWallet,
+    watchSuiAccounts,
     stampOnSui,
     transferOnSui,
 } from './chains.js';
@@ -24,7 +29,36 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDropZone();
     setupButtons();
     checkHealth();
+    restoreWallets();
 });
+
+// Show wallets the user has already authorized, rather than making them click
+// Connect again. Everything here is non-prompting: a page load must never open
+// a wallet dialog.
+function restoreWallets() {
+    onEvmWalletReady(async () => {
+        const address = await restoreEvmWallet();
+        if (address) {
+            walletAddress = address;
+            renderWallet();
+        }
+        // Track switches and revocations from the wallet UI either way.
+        watchEvmAccounts(next => {
+            walletAddress = next;
+            renderWallet();
+        });
+    });
+
+    restoreSuiWallet().then(connection => {
+        if (!connection) return;
+        suiConnection = connection;
+        renderWallet();
+        watchSuiAccounts(connection, next => {
+            suiConnection = next;
+            renderWallet();
+        });
+    }).catch(e => console.warn('Sui wallet restore failed:', e));
+}
 
 // ============ Drop Zone ============
 
@@ -146,9 +180,11 @@ function renderWallet() {
     const btn = document.getElementById('btn-connect');
     const addrEl = document.getElementById('wallet-address');
 
+    // List whatever is connected, regardless of the chain currently selected —
+    // the point is to show the user they are already signed in.
     const parts = [];
-    if (walletAddress && currentChain !== 'sui') parts.push(shortAddress(walletAddress));
-    if (suiConnection && currentChain !== 'evm') parts.push('Sui ' + shortAddress(suiConnection.address));
+    if (walletAddress) parts.push(shortAddress(walletAddress));
+    if (suiConnection) parts.push('Sui ' + shortAddress(suiConnection.address));
 
     if (!parts.length) {
         btn.classList.remove('hidden');
@@ -185,6 +221,10 @@ async function connectWallet() {
     if (wantSui && !suiConnection) {
         try {
             suiConnection = await connectSuiWallet();
+            watchSuiAccounts(suiConnection, next => {
+                suiConnection = next;
+                renderWallet();
+            });
         } catch (e) {
             console.error('Sui wallet connection failed:', e);
             failures.push(e.message);

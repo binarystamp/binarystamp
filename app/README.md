@@ -177,6 +177,22 @@ A stamp that has just been submitted is not yet indexed, so the lookup would
 still report it unclaimed. The UI holds a pending state and keeps the claim
 form closed until a re-check confirms it, which also prevents double stamping.
 
+## Wallet Connection
+
+On load the app restores wallets the user has already authorized, using only
+non-prompting calls — a page load must never open a wallet dialog:
+
+- **EVM** — `eth_accounts`, which returns authorized accounts without a prompt,
+  unlike `eth_requestAccounts`. Extensions inject asynchronously, so the check
+  waits for `ethereum#initialized` with a short timeout.
+- **Sui** — `wallet.accounts`, which the Wallet Standard populates for an
+  authorized origin. Only if that is empty, and the wallet declares
+  `standard:connect` 1.1 or later, is a `{silent: true}` connect attempted;
+  older wallets would ignore the flag and prompt.
+
+`accountsChanged` and the Wallet Standard `change` event keep the header in
+sync when the user switches or revokes accounts.
+
 ## Ownership Transfers
 
 A transfer is offered once a stamp is found, on whichever chain it was found

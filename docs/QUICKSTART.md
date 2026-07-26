@@ -14,6 +14,12 @@ Get BinaryStamp running locally and stamp your first file.
 You only need a wallet for the chain you actually use. Verifying and the AI
 agent work without one.
 
+Once you have authorized the site, reloading the page restores the connection
+and shows your address — there is no need to click **Connect Wallet** again.
+Restoring never opens a wallet dialog: it reads only accounts you have already
+approved. Switching or revoking accounts from the wallet's own UI updates the
+header immediately.
+
 ## 2. Configure
 
 ```bash

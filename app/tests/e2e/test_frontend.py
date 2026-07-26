@@ -272,6 +272,60 @@ def test_sui_owner_skips_ens_lookup(results):
     assert results['SUI_OWNER_SHOWS_ADDRESS'] == 'true'
 
 
+# ============ Wallet restore on page load ============
+
+def test_authorized_evm_wallet_shows_without_clicking(results):
+    assert results['RESTORE_EVM_SHOWS_ADDRESS'] == 'true'
+    assert results['RESTORE_EVM_HIDES_CONNECT'] == 'true'
+
+
+def test_restore_uses_the_non_prompting_call(results):
+    assert results['RESTORE_EVM_USED_ETH_ACCOUNTS'] == 'true'
+
+
+def test_page_load_never_prompts_for_evm(results):
+    """eth_requestAccounts opens a wallet dialog; loading a page must not."""
+    assert results['RESTORE_EVM_DID_NOT_PROMPT'] == 'true'
+    assert results['NO_AUTH_DID_NOT_PROMPT'] == 'true'
+
+
+def test_restore_causes_no_errors(results):
+    assert results['RESTORE_EVM_ERRORS'] == '0'
+
+
+def test_unauthorized_wallet_still_shows_connect(results):
+    assert results['NO_AUTH_SHOWS_CONNECT'] == 'true'
+    assert results['NO_AUTH_HIDES_ADDRESS'] == 'true'
+
+
+def test_authorized_sui_wallet_is_restored(results):
+    assert results['RESTORE_SUI_SHOWS_ADDRESS'] == 'true'
+
+
+def test_exposed_sui_accounts_need_no_connect_call(results):
+    assert results['RESTORE_SUI_NO_SILENT_CALL_NEEDED'] == 'true'
+
+
+def test_page_load_never_prompts_for_sui(results):
+    assert results['RESTORE_SUI_DID_NOT_PROMPT'] == 'true'
+    assert results['OLD_WALLET_DID_NOT_PROMPT'] == 'true'
+
+
+def test_silent_connect_skipped_on_older_wallets(results):
+    """Silent connect landed in standard:connect 1.1; older wallets would prompt."""
+    assert results['OLD_WALLET_NO_SILENT_ATTEMPT'] == 'true'
+
+
+def test_revoking_access_clears_the_header(results):
+    assert results['REVOKE_WAS_CONNECTED'] == 'true'
+    assert results['REVOKE_CLEARS_ADDRESS'] == 'true'
+    assert results['REVOKE_RESTORES_CONNECT'] == 'true'
+
+
+def test_switching_account_updates_the_header(results):
+    assert results['SWITCH_UPDATES_ADDRESS'] == 'true'
+
+
 # ============ Failure honesty ============
 
 def test_missing_wallet_reports_error(results):

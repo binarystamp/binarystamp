@@ -79,6 +79,45 @@ async function connectEvmWallet() {
     return accounts[0];
 }
 
+// Already-authorized account, or null. eth_accounts never prompts, unlike
+// eth_requestAccounts — a page load must not pop a wallet dialog.
+async function restoreEvmWallet() {
+    if (!window.ethereum) return null;
+    try {
+        const accounts = await window.ethereum.request({method: 'eth_accounts'});
+        return accounts && accounts.length ? accounts[0] : null;
+    } catch (e) {
+        console.warn('Could not read authorized EVM accounts:', e);
+        return null;
+    }
+}
+
+// Wallet extensions inject asynchronously, so window.ethereum may not exist
+// yet when the page finishes parsing.
+function onEvmWalletReady(callback) {
+    if (window.ethereum) {
+        callback();
+        return;
+    }
+    let settled = false;
+    const fire = () => {
+        if (settled) return;
+        settled = true;
+        callback();
+    };
+    window.addEventListener('ethereum#initialized', fire, {once: true});
+    setTimeout(fire, 3000);
+}
+
+// Account switches and disconnects arrive as an accountsChanged event with the
+// new list; an empty list means the site was revoked.
+function watchEvmAccounts(callback) {
+    if (!window.ethereum || typeof window.ethereum.on !== 'function') return;
+    window.ethereum.on('accountsChanged', accounts => {
+        callback(accounts && accounts.length ? accounts[0] : null);
+    });
+}
+
 // Base Sepolia only — a stamp sent to the wrong network is silently lost.
 async function ensureBaseNetwork() {
     const current = await window.ethereum.request({method: 'eth_chainId'});
@@ -176,6 +215,54 @@ async function connectSuiWallet() {
     if (!accounts.length) throw new Error('No Sui account authorized');
 
     return {wallet: wallet, account: accounts[0], address: accounts[0].address};
+}
+
+// Silent connect was added in standard:connect 1.1. On an older wallet the
+// flag would be ignored and the user would get a dialog just for loading the
+// page, so only ask when the version says it is understood.
+function supportsSilentConnect(feature) {
+    const version = (feature && feature.version) || '1.0.0';
+    const [major, minor] = version.split('.').map(Number);
+    return major > 1 || (major === 1 && minor >= 1);
+}
+
+// Restore a previously authorized Sui wallet without prompting.
+async function restoreSuiWallet() {
+    for (const wallet of discoverSuiWallets()) {
+        // Already-authorized accounts are exposed directly — no call needed.
+        if (wallet.accounts && wallet.accounts.length) {
+            return {wallet: wallet, account: wallet.accounts[0], address: wallet.accounts[0].address};
+        }
+
+        const feature = wallet.features['standard:connect'];
+        if (!feature || !supportsSilentConnect(feature)) continue;
+
+        try {
+            const result = await feature.connect({silent: true});
+            const accounts = (result && result.accounts) || wallet.accounts || [];
+            if (accounts.length) {
+                return {wallet: wallet, account: accounts[0], address: accounts[0].address};
+            }
+        } catch (e) {
+            // A wallet that refuses a silent connect is simply not connected.
+            console.warn('Silent Sui connect declined:', e);
+        }
+    }
+    return null;
+}
+
+// Sui wallets report account changes and disconnects through standard:events.
+function watchSuiAccounts(connection, callback) {
+    const events = connection.wallet.features['standard:events'];
+    if (!events || typeof events.on !== 'function') return;
+
+    events.on('change', change => {
+        if (!change || !('accounts' in change)) return;
+        const accounts = change.accounts || [];
+        callback(accounts.length
+            ? {wallet: connection.wallet, account: accounts[0], address: accounts[0].address}
+            : null);
+    });
 }
 
 let suiSdk = null;
@@ -295,10 +382,15 @@ export {
     encodeStampCall,
     encodeTransferCall,
     connectEvmWallet,
+    restoreEvmWallet,
+    onEvmWalletReady,
+    watchEvmAccounts,
     stampOnEvm,
     transferOnEvm,
     discoverSuiWallets,
     connectSuiWallet,
+    restoreSuiWallet,
+    watchSuiAccounts,
     stampOnSui,
     transferOnSui,
 };
