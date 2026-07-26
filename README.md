@@ -88,6 +88,11 @@ ENS CCIP-Read Gateway <--- binarystamp.eth subdomains
 | Sui Registry (shared object) | Sui Testnet | [`0x2ba5935995d77fcae22d4403084a8f949da03ed49fbcad053cbd4df51c9a713e`](https://suiscan.xyz/testnet/object/0x2ba5935995d77fcae22d4403084a8f949da03ed49fbcad053cbd4df51c9a713e) |
 | ENS Name | Ethereum Mainnet | [`binarystamp.eth`](https://app.ens.domains/binarystamp.eth) |
 
+## Assets
+
+Splash screens in [`assets/`](assets/) — 16:9, dark and light, SVG plus 640×360
+and 1280×720 PNG.
+
 ## Documentation
 
 - [Presentation](docs/presentation/index.html) — what it is and why, in a few slides
