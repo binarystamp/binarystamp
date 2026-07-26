@@ -90,6 +90,7 @@ ENS CCIP-Read Gateway <--- binarystamp.eth subdomains
 
 ## Documentation
 
+- [Presentation](docs/presentation/index.html) — what it is and why, in a few slides
 - [Quickstart](docs/QUICKSTART.md) — running locally and stamping your first file
 - [API Reference](docs/API.md) — HTTP endpoints
 - [Deployment](docs/DEPLOYMENT.md) — production and contract deployment

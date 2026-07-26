@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BinaryStamp — Proof that a file existed, and that it was yours</title>
+<meta name="description" content="A multi-chain file provenance registry. Hash locally, stamp on-chain, prove authorship and priority without disclosing content.">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --bg: #ffffff;
+    --bg-card: #ffffff;
+    --bg-hover: #f5f5f5;
+    --border: #e0e0e0;
+    --border-light: #f0f0f0;
+    --text: #000000;
+    --text-secondary: #666666;
+    --text-muted: #999999;
+    --success: #2d8a4e;
+    --warning: #b7791f;
+    --radius: 6px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #0a0a0a;
+        --bg-card: #111111;
+        --bg-hover: #1a1a1a;
+        --border: #222222;
+        --border-light: #1a1a1a;
+        --text: #ffffff;
+        --text-secondary: #999999;
+        --text-muted: #666666;
+    }
+}
+
+html, body { height: 100%; }
+
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ============ Deck ============ */
+
+.deck {
+    height: 100vh;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+}
+
+.slide {
+    min-height: 100vh;
+    scroll-snap-align: start;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 72px 32px 96px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.slide-inner {
+    width: 100%;
+    max-width: 880px;
+}
+
+/* ============ Type ============ */
+
+.eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-size: clamp(32px, 6vw, 60px);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    font-weight: 600;
+}
+
+h2 {
+    font-size: clamp(24px, 4vw, 38px);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+p { color: var(--text-secondary); }
+
+.lead {
+    font-size: clamp(16px, 2.2vw, 20px);
+    max-width: 68ch;
+    margin-top: 20px;
+}
+
+.note {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 24px;
+    max-width: 70ch;
+}
+
+strong { color: var(--text); font-weight: 600; }
+code { font-family: var(--mono); font-size: 0.92em; }
+
+/* ============ Logo ============ */
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.logo span {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+/* ============ Layout blocks ============ */
+
+.grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 32px;
+}
+
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+.card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    background: var(--bg-card);
+}
+
+.card p { font-size: 13.5px; }
+
+.card-icon {
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: block;
+}
+
+/* Numbered steps */
+.steps { counter-reset: step; margin-top: 32px; }
+
+.step {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 16px;
+    padding: 16px 0;
+    border-top: 1px solid var(--border-light);
+}
+
+.step::before {
+    content: counter(step);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.step p { font-size: 14px; }
+
+/* Key/value rows */
+.rows { margin-top: 28px; border-top: 1px solid var(--border-light); }
+
+.row {
+    display: grid;
+    grid-template-columns: 190px 1fr;
+    gap: 20px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 14px;
+}
+
+.row-label { color: var(--text-muted); }
+.row-value { color: var(--text-secondary); }
+
+/* Monospace figure */
+.mono-block {
+    font-family: var(--mono);
+    font-size: clamp(10px, 1.5vw, 13px);
+    line-height: 1.75;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-top: 28px;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+.mono-block b { color: var(--text); font-weight: 600; }
+
+/* Comparison */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 32px; }
+
+.compare-col {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+}
+
+.compare-col h3 { display: flex; align-items: center; gap: 8px; }
+.yes h3 { color: var(--success); }
+.no h3 { color: var(--warning); }
+
+.compare-col ul { list-style: none; margin-top: 12px; }
+
+.compare-col li {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    padding: 5px 0 5px 18px;
+    position: relative;
+}
+
+.compare-col li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 12px;
+    width: 6px;
+    height: 6px;
+    border: 1px solid var(--text-muted);
+}
+
+.yes li::before { border-radius: 50%; }
+
+/* Status pills */
+.pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+
+.pill {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 5px 12px;
+    color: var(--text-secondary);
+}
+
+.pill.live { border-color: var(--success); color: var(--success); }
+
+/* ============ Navigation ============ */
+
+.nav {
+    position: fixed;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 10;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid var(--text-muted);
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.dot:hover { border-color: var(--text); }
+.dot[aria-current="true"] { background: var(--text); border-color: var(--text); }
+
+.progress {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 2px;
+    background: var(--text);
+    width: 0;
+    z-index: 20;
+    transition: width 0.2s;
+}
+
+.hint {
+    position: fixed;
+    left: 24px;
+    bottom: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    z-index: 10;
+}
+
+.counter {
+    position: fixed;
+    right: 24px;
+    bottom: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    z-index: 10;
+}
+
+/* ============ Responsive ============ */
+
+@media (max-width: 720px) {
+    .slide { padding: 56px 20px 80px; }
+    .grid-2, .grid-3, .compare { grid-template-columns: 1fr; }
+    .row { grid-template-columns: 1fr; gap: 2px; }
+    .nav { display: none; }
+    .hint { display: none; }
+}
+
+@media print {
+    .deck { height: auto; overflow: visible; }
+    .slide { min-height: auto; page-break-after: always; border: none; padding: 40px 0; }
+    .nav, .hint, .counter, .progress { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<div class="deck" id="deck">
+
+    <!-- 1. Title -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="logo">
+                <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+                    <rect x="2" y="2" width="28" height="28" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="16" cy="16" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <line x1="10" y1="10" x2="22" y2="22" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>BinaryStamp</span>
+            </div>
+            <h1>Proof that a file existed,<br>and that it was yours.</h1>
+            <p class="lead">
+                A multi-chain provenance registry. Hash any file in your browser, register
+                that hash on an immutable ledger, and hold a timestamped, independently
+                verifiable record of authorship — without ever revealing the file.
+            </p>
+            <div class="pills">
+                <span class="pill live">Base</span>
+                <span class="pill live">Sui</span>
+                <span class="pill live">ENS</span>
+                <span class="pill live">Walrus</span>
+                <span class="pill live">The Graph</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. What it is -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">What it is</div>
+            <h2>A registry of hashes, not of files</h2>
+            <p class="lead">
+                Drop a file in. It is hashed with SHA-256 <strong>entirely in your browser</strong>
+                — the bytes never leave your machine. The 32-byte digest is written to a
+                blockchain, signed by your own wallet, alongside an optional description and
+                metadata blob.
+            </p>
+            <div class="grid grid-3">
+                <div class="card">
+                    <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="9" x2="17" y2="9" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="13" x2="14" y2="13" stroke="currentColor" stroke-width="1.5"/></svg>
+                    <h3>Nothing is uploaded</h3>
+                    <p>Only a digest is published. The registry never sees your content.</p>
+                </div>
+                <div class="card">
+                    <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><polyline points="12,7 12,12 16,14" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                    <h3>Timestamped by consensus</h3>
+                    <p>The block's time is agreed by a network, not asserted by a file header.</p>
+                </div>
+                <div class="card">
+                    <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3l7 4v6c0 4-3 6.5-7 8-4-1.5-7-4-7-8V7z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                    <h3>Owned by you</h3>
+                    <p>Your wallet signs the transaction, so the record is yours and transferable.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. The problem -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">The problem</div>
+            <h2>“I had this first” is remarkably hard to prove</h2>
+            <p class="lead">
+                Every everyday marker of when a thing existed is either editable, private,
+                or someone else's to withdraw.
+            </p>
+            <div class="compare">
+                <div class="compare-col no">
+                    <h3>
+                        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12" stroke="currentColor" stroke-width="1.5"/><line x1="12" y1="4" x2="4" y2="12" stroke="currentColor" stroke-width="1.5"/></svg>
+                        What we usually rely on
+                    </h3>
+                    <ul>
+                        <li>File modification dates — trivially rewritten</li>
+                        <li>Email to yourself — provable only if the provider cooperates, forever</li>
+                        <li>Cloud storage history — the vendor controls, and can lose, the evidence</li>
+                        <li>Notaries and registries — slow, costly, jurisdiction-bound</li>
+                        <li>“Posted publicly on this date” — requires disclosing the work itself</li>
+                    </ul>
+                </div>
+                <div class="compare-col yes">
+                    <h3>
+                        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><polyline points="3,8 7,12 13,4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                        What a claim actually needs
+                    </h3>
+                    <ul>
+                        <li>A time that no single party can move</li>
+                        <li>A record that survives the company that made it</li>
+                        <li>Verifiable by an opponent, not just by you</li>
+                        <li>No obligation to reveal the content to establish the date</li>
+                        <li>Cheap enough to do routinely, not only when it matters</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="note">
+                The awkward case is the common one: you want to establish that you held an idea
+                on a given date <em>without</em> publishing it — before a pitch, a filing, or a
+                negotiation.
+            </p>
+        </div>
+    </section>
+
+    <!-- 4. How it solves it -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">How it solves it</div>
+            <h2>Publish a commitment, not the content</h2>
+            <p class="lead">
+                A cryptographic hash is a one-way fingerprint. It is infeasible to derive the
+                file from it, and infeasible to find a different file that produces it. So the
+                digest can be made public while the file stays private.
+            </p>
+            <div class="steps">
+                <div class="step">
+                    <div>
+                        <h3>Hash locally</h3>
+                        <p>SHA-256 runs in the browser. A one-byte change gives a completely different digest.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div>
+                        <h3>Stamp on-chain</h3>
+                        <p>Your wallet signs a transaction recording the digest, the time, and your address.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div>
+                        <h3>Keep the file</h3>
+                        <p>Nothing is disclosed. The chain holds a commitment to something only you can produce.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div>
+                        <h3>Reveal when it matters</h3>
+                        <p>Show the file. Anyone re-hashes it, matches the digest, and reads the block's timestamp.</p>
+                    </div>
+                </div>
+            </div>
+            <p class="note">
+                This is the classic commit–reveal pattern. The commitment is public and dated from
+                day one; disclosure happens on your schedule, or never.
+            </p>
+        </div>
+    </section>
+
+    <!-- 5. Why immutability matters -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">Why a blockchain</div>
+            <h2>The value is in what nobody can do</h2>
+            <p class="lead">
+                A database with a timestamp column proves nothing to an adversary — whoever runs it
+                could have written that row this morning. The properties that make a claim hold up
+                are all negative ones.
+            </p>
+            <div class="rows">
+                <div class="row"><div class="row-label">Nobody can backdate</div><div class="row-value">The time comes from block ordering agreed across a network, not from a field someone set.</div></div>
+                <div class="row"><div class="row-label">Nobody can delete</div><div class="row-value">Not the operator, not you, not a court order to a single company.</div></div>
+                <div class="row"><div class="row-label">Nobody can gatekeep</div><div class="row-value">Verification needs a public node, not our permission or our continued existence.</div></div>
+                <div class="row"><div class="row-label">Nobody has to be trusted</div><div class="row-value">The counterparty checks the chain themselves. No shared faith in a vendor.</div></div>
+                <div class="row"><div class="row-label">Nobody learns the content</div><div class="row-value">A digest is public; the file behind it is not.</div></div>
+            </div>
+            <p class="note">
+                Worth stating plainly: a stamp proves a digest existed at a time and which key signed
+                it. It does not prove the signer authored the work, nor that the claim is original.
+                It establishes <strong>priority and integrity</strong> — which is usually the disputed part.
+            </p>
+        </div>
+    </section>
+
+    <!-- 6. IP attribution -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">Use case</div>
+            <h2>Intellectual property and priority</h2>
+            <p class="lead">
+                Most disputes turn on sequence: who had it first, and has the artefact changed since.
+                A stamp answers both, for a few cents, at the moment of creation rather than the
+                moment of conflict.
+            </p>
+            <div class="grid grid-2">
+                <div class="card">
+                    <h3>Design and creative work</h3>
+                    <p>Stamp each iteration. The chain records the whole development trail, dated, before anything ships.</p>
+                </div>
+                <div class="card">
+                    <h3>Research and invention</h3>
+                    <p>Establish a conception date while a patent is still being drafted, without publishing and destroying novelty.</p>
+                </div>
+                <div class="card">
+                    <h3>Trade secrets</h3>
+                    <p>Prove a document predates a departing employee's new venture — while it stays a secret.</p>
+                </div>
+                <div class="card">
+                    <h3>Contracts and evidence</h3>
+                    <p>Show a document is byte-identical to the one agreed on a date. Tampering changes the digest.</p>
+                </div>
+                <div class="card">
+                    <h3>Defensive publication</h3>
+                    <p>Stamp now, reveal later as prior art to block someone else's downstream claim.</p>
+                </div>
+                <div class="card">
+                    <h3>Journalism and sources</h3>
+                    <p>Fix a chain of custody for material whose date is later challenged.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. AI agents -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">Use case — where this goes next</div>
+            <h2>Agents proving, and reusing, work</h2>
+            <p class="lead">
+                Computation is deterministic: the same data through the same function yields the
+                same result. That makes the <em>inputs</em> addressable — and a registry of input
+                digests becomes a shared, verifiable memo of work already done.
+            </p>
+            <div class="mono-block"><b>key</b>     = sha256( data ‖ function )      what was asked
+<b>stamp</b>   = key on-chain, signed, timestamped
+<b>metadata</b>= sha256( result ) + Walrus blob   what came back
+
+agent A   computes, stamps <b>key</b>, attaches <b>result</b>
+agent B   derives the same <b>key</b> → already stamped → fetches result
+          ── skips the work, verifies by re-hashing what it fetched</div>
+            <div class="grid grid-3">
+                <div class="card">
+                    <h3>Don't repeat expensive work</h3>
+                    <p>An identical job across organisations resolves to the same key. Fetch instead of recompute.</p>
+                </div>
+                <div class="card">
+                    <h3>Attribution for agents</h3>
+                    <p>The signature says which agent produced a result, and when. A basis for credit, billing, or audit.</p>
+                </div>
+                <div class="card">
+                    <h3>An auditable trail</h3>
+                    <p>Reconstruct what an agent was given and what it returned, long after the run.</p>
+                </div>
+            </div>
+            <p class="note">
+                Honest limit: a stamp proves an agent <em>claimed</em> a result, not that the result is
+                correct. Trust comes from the signer's reputation, from spot-checking by re-running, or —
+                see the next slide — from attaching a proof rather than an assertion.
+            </p>
+        </div>
+    </section>
+
+    <!-- 8. Further applications -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">Use case</div>
+            <h2>Anywhere “which version, and when” matters</h2>
+            <div class="grid grid-2">
+                <div class="card">
+                    <h3>Training data provenance</h3>
+                    <p>Stamp a dataset before training. Later show the model was trained on that corpus, not one revised after the fact.</p>
+                </div>
+                <div class="card">
+                    <h3>Model release integrity</h3>
+                    <p>Publish weight digests so downloaders can prove they hold the genuine artefact.</p>
+                </div>
+                <div class="card">
+                    <h3>Software supply chain</h3>
+                    <p>Stamp build outputs. A user verifies the binary matches what the maintainer released.</p>
+                </div>
+                <div class="card">
+                    <h3>Synthetic media disclosure</h3>
+                    <p>Register generated media at creation, so origin is checkable rather than inferred.</p>
+                </div>
+                <div class="card">
+                    <h3>Regulatory and audit records</h3>
+                    <p>Prove a report is the one filed on the day, unchanged since.</p>
+                </div>
+                <div class="card">
+                    <h3>Academic priority</h3>
+                    <p>Date a result before peer review concludes, without pre-printing it.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 9. How it's built -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">How it's built</div>
+            <h2>Multi-chain, and addressable by name</h2>
+            <div class="mono-block">file ──▶ SHA-256 (in browser) ──▶ lookup
+                                │
+              ┌─────────────────┴─────────────────┐
+              ▼                                   ▼
+        <b>already stamped</b>                      <b>unclaimed</b>
+        owner · date · metadata               claim it
+        transfer · provenance Q&A             │
+                                              ├─▶ Base   (Solidity)
+                                              ├─▶ Sui    (Move)
+                                              └─▶ Walrus (metadata blob)</div>
+            <div class="rows">
+                <div class="row"><div class="row-label">Base &amp; Sui</div><div class="row-value">Stamp on either or both. Ownership is transferable on both chains.</div></div>
+                <div class="row"><div class="row-label">ENS names</div><div class="row-value">Every stamp resolves as a real ENS name — by digest, or by stamp number.</div></div>
+                <div class="row"><div class="row-label">Walrus</div><div class="row-value">Optional metadata stored as a decentralized blob, referenced from the stamp.</div></div>
+                <div class="row"><div class="row-label">The Graph</div><div class="row-value">Indexes stamps and transfers for instant lookup and full history.</div></div>
+                <div class="row"><div class="row-label">Provenance agent</div><div class="row-value">Ask questions about a file's ownership chain in plain language.</div></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 10. Future -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">Future improvements</div>
+            <h2>Where it goes from here</h2>
+            <div class="grid grid-2">
+                <div class="card">
+                    <h3>Mainnet, and cheaper stamps</h3>
+                    <p>Move beyond testnets, and batch many digests into one transaction under a Merkle root so a stamp costs a fraction of a cent.</p>
+                </div>
+                <div class="card">
+                    <h3>From assertions to proofs</h3>
+                    <p>Attach attestations to computation stamps — signed enclave receipts, or zero-knowledge proofs — so a result is verifiable without re-running it.</p>
+                </div>
+                <div class="card">
+                    <h3>An agent-facing API</h3>
+                    <p>An SDK and MCP server so agents stamp and query results as a normal step, with sponsored gas so they need no wallet funding.</p>
+                </div>
+                <div class="card">
+                    <h3>Richer metadata schemas</h3>
+                    <p>Typed records for licences, authorship and derivation, so a stamp can express “derived from” and not merely “exists”.</p>
+                </div>
+                <div class="card">
+                    <h3>Stronger identity</h3>
+                    <p>Bind stamps to verified identities or organisations, so a signature carries a reputation rather than only an address.</p>
+                </div>
+                <div class="card">
+                    <h3>Fuzzy matching</h3>
+                    <p>Perceptual hashes alongside exact digests, to recognise a re-encoded image or a lightly edited document.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 11. Close -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">In one line</div>
+            <h2>Drop a file. Keep the proof.</h2>
+            <p class="lead">
+                A permanent, independently checkable record that a particular file existed at a
+                particular moment and belonged to a particular key — established without disclosing
+                anything, and verifiable by anyone, long after we are gone.
+            </p>
+            <div class="rows">
+                <div class="row"><div class="row-label">Try it</div><div class="row-value">binarystamp.com</div></div>
+                <div class="row"><div class="row-label">Source</div><div class="row-value">github.com/binarystamp/binarystamp</div></div>
+                <div class="row"><div class="row-label">ENS</div><div class="row-value">binarystamp.eth</div></div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<nav class="nav" id="nav" aria-label="Slides"></nav>
+<div class="hint">&larr; &rarr; or scroll</div>
+<div class="counter" id="counter"></div>
+
+<script>
+(function () {
+    const deck = document.getElementById('deck');
+    const slides = Array.from(deck.querySelectorAll('.slide'));
+    const nav = document.getElementById('nav');
+    const counter = document.getElementById('counter');
+    const progress = document.getElementById('progress');
+
+    let current = 0;
+
+    slides.forEach((_, i) => {
+        const dot = document.createElement('button');
+        dot.className = 'dot';
+        dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+        dot.addEventListener('click', () => go(i));
+        nav.appendChild(dot);
+    });
+
+    const dots = Array.from(nav.children);
+
+    function render() {
+        dots.forEach((d, i) => d.setAttribute('aria-current', String(i === current)));
+        counter.textContent = (current + 1) + ' / ' + slides.length;
+        progress.style.width = ((current + 1) / slides.length * 100) + '%';
+    }
+
+    function go(index) {
+        current = Math.max(0, Math.min(slides.length - 1, index));
+        slides[current].scrollIntoView({behavior: 'smooth'});
+        render();
+    }
+
+    // Scrolling is the source of truth; keys are a shortcut into it.
+    let ticking = false;
+    deck.addEventListener('scroll', () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+            const middle = deck.scrollTop + deck.clientHeight / 2;
+            let nearest = 0;
+            slides.forEach((s, i) => { if (s.offsetTop <= middle) nearest = i; });
+            if (nearest !== current) { current = nearest; render(); }
+            ticking = false;
+        });
+    });
+
+    document.addEventListener('keydown', e => {
+        const keys = {
+            ArrowRight: 1, ArrowDown: 1, PageDown: 1, ' ': 1,
+            ArrowLeft: -1, ArrowUp: -1, PageUp: -1,
+        };
+        if (e.key in keys) {
+            e.preventDefault();
+            go(current + keys[e.key]);
+        } else if (e.key === 'Home') {
+            e.preventDefault();
+            go(0);
+        } else if (e.key === 'End') {
+            e.preventDefault();
+            go(slides.length - 1);
+        }
+    });
+
+    render();
+})();
+</script>
+
+</body>
+</html>
