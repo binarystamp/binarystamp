@@ -10,3 +10,9 @@ build/
 generated/
 .pytest_cache/
 *.bin
+
+# Editors
+.idea/
+.vscode/
+*.swp
+.DS_Store
