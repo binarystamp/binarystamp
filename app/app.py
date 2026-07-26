@@ -28,7 +28,8 @@ SUI_PACKAGE_ID = os.getenv('SUI_PACKAGE_ID', '')
 SUI_REGISTRY_ID = os.getenv('SUI_REGISTRY_ID', '')
 SUI_EVENT_PAGE_SIZE = int(os.getenv('SUI_EVENT_PAGE_SIZE', '50'))
 SUI_EVENT_MAX_PAGES = int(os.getenv('SUI_EVENT_MAX_PAGES', '10'))
-ENS_GATEWAY_URL = os.getenv('ENS_GATEWAY_URL', '')
+# ENS_GATEWAY_URL is read by scripts/deploy_resolver.py, not by the app: this
+# service *is* the gateway, so ens_resolver.py serves the lookups directly.
 
 # ABI for the EVM mirror contract - load from file, fallback to env
 ABI_FILE = os.path.join(os.path.dirname(__file__), 'contracts', 'evm', 'abi.json')
@@ -379,45 +380,6 @@ def ai_provenance():
     })
 
 
-@app.route('/api/ens/resolve/<name>', methods=['GET'])
-def ens_resolve(name):
-    """Resolve ENS name (e.g., <hash>.binarystamp.eth)."""
-    # This would use the CCIP-Read gateway
-    if ENS_GATEWAY_URL:
-        try:
-            resp = requests.get(f'{ENS_GATEWAY_URL}/resolve/{name}', timeout=10)
-            return jsonify(resp.json())
-        except Exception as e:
-            return jsonify({'error': str(e)}), 502
-
-    # Fallback: try to resolve via subgraph
-    parts = name.replace('.binarystamp.eth', '').split('.')
-    if parts:
-        label = parts[0]
-        # Check if it's a hash or a number
-        if label.startswith('0x') or len(label) == 64:
-            file_hash = label if label.startswith('0x') else '0x' + label
-            result = query_subgraph(file_hash) if SUBGRAPH_URL else None
-            if result and result.get('found'):
-                return jsonify({
-                    'name': name,
-                    'resolved': True,
-                    'owner': result['owner'],
-                    'timestamp': result.get('timestamp'),
-                })
-        elif label.isdigit():
-            # Resolve by stamp number
-            result = query_subgraph_by_number(int(label))
-            if result:
-                return jsonify({
-                    'name': name,
-                    'resolved': True,
-                    **result
-                })
-
-    return jsonify({'name': name, 'resolved': False})
-
-
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({
@@ -615,44 +577,6 @@ def query_subgraph(file_hash):
                 'firstStampedAt': lookup['firstStampedAt'],
                 'stamps': lookup['stamps'],
                 'source': 'subgraph'
-            }
-    except Exception as e:
-        log.error(f'Subgraph query failed: {e}')
-    return None
-
-
-def query_subgraph_by_number(number):
-    """Query The Graph for stamp by number."""
-    if not SUBGRAPH_URL:
-        return None
-    query = '''
-    query($number: ID!) {
-        stamp(id: $number) {
-            fileHash
-            owner
-            timestamp
-            metadataHash
-            walrusBlobId
-            description
-            stampNumber
-        }
-    }
-    '''
-    try:
-        resp = requests.post(
-            SUBGRAPH_URL,
-            json={'query': query, 'variables': {'number': str(number)}},
-            timeout=10
-        )
-        data = resp.json().get('data', {})
-        stamp = data.get('stamp')
-        if stamp:
-            return {
-                'found': True,
-                'fileHash': stamp['fileHash'],
-                'owner': stamp['owner'],
-                'timestamp': stamp['timestamp'],
-                'stampNumber': stamp['stampNumber'],
             }
     except Exception as e:
         log.error(f'Subgraph query failed: {e}')
