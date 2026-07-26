@@ -387,47 +387,80 @@ input[type="checkbox"] {
     font-size: 14px;
 }
 
-.result-success {
+/* One grid for the whole table, rather than a flex row per line: the label
+   column is then sized once to the longest label and stays aligned down the
+   table, instead of every row negotiating its own split. */
+.result-success,
+.result-not-found {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 28px;
+    align-items: start;
+    padding: 2px 16px;
+    border-radius: var(--radius);
     background: var(--bg-hover);
-    border: 1px solid var(--success);
 }
 
-.result-not-found {
-    background: var(--bg-hover);
-    border: 1px solid var(--border);
-}
+.result-success { border: 1px solid var(--success); }
+.result-not-found { border: 1px solid var(--border); }
 
 .result-error {
+    padding: 12px 16px;
+    border-radius: var(--radius);
     background: var(--bg-hover);
     border: 1px solid var(--error);
     color: var(--error);
-}
-
-.result-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 0;
-    border-bottom: 1px solid var(--border-light);
     font-size: 13px;
 }
 
-.result-row:last-child { border-bottom: none; }
+/* Rows are structural only; their cells belong to the grid above. */
+.result-row { display: contents; }
 
-.result-label { color: var(--text-muted); }
+.result-label,
+.result-value {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.result-row:last-child .result-label,
+.result-row:last-child .result-value { border-bottom: none; }
+
+.result-label {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
 
 .result-value {
+    text-align: right;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Identifiers — hashes, addresses, names — read better fixed-width. Dates and
+   prose do not. */
+.result-value.mono {
     font-family: var(--mono);
     font-size: 12px;
-    word-break: break-all;
-    text-align: right;
-    max-width: 60%;
 }
 
 /* ============ Spinner ============ */
 /* Negative angle: CSS rotates clockwise for positive values, so this spins
    counter-clockwise. */
 @keyframes spin { to { transform: rotate(-360deg); } }
-.spinner { animation: spin 0.8s linear infinite; }
+
+.spinner {
+    animation: spin 0.8s linear infinite;
+    transform-origin: center;
+}
+
+/* An SVG child element resolves transform-origin against the nearest viewBox,
+   not its own box, so a bare `center` can sit off the shape and make it orbit
+   instead of spin. fill-box pins the origin to the circle itself. */
+circle.spinner {
+    transform-box: fill-box;
+}
 
 /* ============ Utilities ============ */
 .hidden { display: none !important; }
@@ -530,8 +563,13 @@ input[type="checkbox"] {
 }
 
 .result-history {
-    margin-top: 12px;
-    font-size: 12px;
+    grid-column: 1 / -1;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
     color: var(--text-muted);
 }
 

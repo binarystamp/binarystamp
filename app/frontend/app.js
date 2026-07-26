@@ -322,6 +322,12 @@ async function doStamp() {
 
 const CHAIN_LABELS = {evm: 'Base Sepolia', sui: 'Sui Testnet'};
 
+function txLink(explorer, txHash) {
+    const short = txHash.slice(0, 10) + '...' + txHash.slice(-8);
+    return '<a href="' + escapeHtml(explorer) + '" target="_blank" rel="noopener">'
+        + escapeHtml(short) + '</a>';
+}
+
 function showStampResult(el, success, data) {
     el.classList.remove('hidden');
 
@@ -331,15 +337,11 @@ function showStampResult(el, success, data) {
     }
 
     let html = '<div class="result-success">';
-    html += '<div class="result-row"><span class="result-label">Status</span>'
-        + '<span class="result-value" style="color:var(--success)">&#10003; Stamped</span></div>';
+    html += row('Status', '&#10003; Stamped', SUCCESS_STYLE);
 
     for (const result of data.results || []) {
-        const short = result.txHash.slice(0, 10) + '...' + result.txHash.slice(-8);
-        html += '<div class="result-row"><span class="result-label">'
-            + escapeHtml(CHAIN_LABELS[result.chain] || result.chain) + '</span>'
-            + '<span class="result-value"><a href="' + escapeHtml(result.explorer)
-            + '" target="_blank" rel="noopener">' + escapeHtml(short) + '</a></span></div>';
+        html += row(CHAIN_LABELS[result.chain] || result.chain,
+                    txLink(result.explorer, result.txHash), MONO);
     }
 
     html += '</div>';
@@ -442,15 +444,10 @@ function showTransferResult(el, success, data) {
         return;
     }
 
-    const short = data.txHash.slice(0, 10) + '...' + data.txHash.slice(-8);
     el.innerHTML = '<div class="result-success">'
-        + '<div class="result-row"><span class="result-label">Status</span>'
-        + '<span class="result-value" style="color:var(--success)">&#10003; Transferred</span></div>'
-        + '<div class="result-row"><span class="result-label">New owner</span>'
-        + '<span class="result-value">' + escapeHtml(data.newOwner) + '</span></div>'
-        + '<div class="result-row"><span class="result-label">Transaction</span>'
-        + '<span class="result-value"><a href="' + escapeHtml(data.explorer)
-        + '" target="_blank" rel="noopener">' + escapeHtml(short) + '</a></span></div>'
+        + row('Status', '&#10003; Transferred', SUCCESS_STYLE)
+        + row('New owner', escapeHtml(data.newOwner), MONO)
+        + row('Transaction', txLink(data.explorer, data.txHash), MONO)
         + '</div>';
 }
 
@@ -583,11 +580,19 @@ function showLookupError(message) {
     el.innerHTML = '<div class="result-error">&#10007; ' + escapeHtml(message) + '</div>';
 }
 
-function row(label, value, style) {
+// `value` is trusted HTML; callers escape their own text. opts.mono marks an
+// identifier (hash, address, name) for the fixed-width column treatment.
+function row(label, value, opts) {
+    const options = opts || {};
+    const cls = 'result-value' + (options.mono ? ' mono' : '');
     return '<div class="result-row"><span class="result-label">' + escapeHtml(label)
-        + '</span><span class="result-value"' + (style ? ' style="' + style + '"' : '')
+        + '</span><span class="' + cls + '"'
+        + (options.style ? ' style="' + options.style + '"' : '')
         + '>' + value + '</span></div>';
 }
+
+const MONO = {mono: true};
+const SUCCESS_STYLE = {style: 'color:var(--success)'};
 
 const SOURCE_LABELS = {
     subgraph: 'Base Sepolia',
@@ -622,8 +627,8 @@ function showLookupResult(data, hash) {
     pendingStamp = null;
 
     let html = '<div class="result-success">';
-    html += row('Status', '&#10003; Stamped', 'color:var(--success)');
-    html += row('Owner', ownerSlot(data.owner));
+    html += row('Status', '&#10003; Stamped', SUCCESS_STYLE);
+    html += row('Owner', ownerSlot(data.owner), MONO);
 
     const ts = data.timestamp || data.firstStampedAt;
     if (ts) html += row('Stamped', escapeHtml(new Date(parseInt(ts) * 1000).toLocaleString()));
@@ -636,7 +641,7 @@ function showLookupResult(data, hash) {
     if (data.walrusBlobId) {
         html += row('Metadata', '<a href="' + API + '/api/walrus/fetch/'
             + encodeURIComponent(data.walrusBlobId) + '" target="_blank" rel="noopener">'
-            + escapeHtml(data.walrusBlobId) + '</a>');
+            + escapeHtml(data.walrusBlobId) + '</a>', MONO);
     }
 
     // ENS resolution goes through the subgraph, so names only exist for
@@ -645,16 +650,16 @@ function showLookupResult(data, hash) {
         const number = data.stampNumber
             || (data.stamps && data.stamps.length && data.stamps[0].stampNumber);
         if (number) {
-            html += row('ENS name', ensLink(ensNameForStampNumber(number)));
+            html += row('ENS name', ensLink(ensNameForStampNumber(number)), MONO);
         }
-        html += row('ENS from hash', ensLink(ensNameForHash(hash)));
+        html += row('ENS from hash', ensLink(ensNameForHash(hash)), MONO);
     }
 
     if (data.stamps && data.stamps.length > 1) {
         html += '<div class="result-history">History (' + data.stamps.length + ' stamps)</div>';
         for (const s of data.stamps) {
             const d = new Date(parseInt(s.timestamp) * 1000).toLocaleString();
-            html += row('#' + s.stampNumber, escapeHtml(s.owner.slice(0, 10) + '... @ ' + d));
+            html += row('#' + s.stampNumber, escapeHtml(s.owner.slice(0, 10) + '... @ ' + d), MONO);
         }
     }
 
@@ -681,11 +686,11 @@ function showEnsResult(data, name) {
     }
 
     let html = '<div class="result-success">';
-    html += row('Status', '&#10003; Resolved', 'color:var(--success)');
-    html += row('Name', escapeHtml(data.name || name));
-    html += row('Owner', ownerSlot(data.owner));
+    html += row('Status', '&#10003; Resolved', SUCCESS_STYLE);
+    html += row('Name', escapeHtml(data.name || name), MONO);
+    html += row('Owner', ownerSlot(data.owner), MONO);
     if (data.description) html += row('Notes', escapeHtml(data.description));
-    if (data.walrusBlobId) html += row('Metadata', escapeHtml(data.walrusBlobId));
+    if (data.walrusBlobId) html += row('Metadata', escapeHtml(data.walrusBlobId), MONO);
     html += '</div>';
     el.innerHTML = html;
 
@@ -703,11 +708,11 @@ function showClaimedPending(result, description, walrusBlobId) {
         : walletAddress;
 
     let html = '<div class="result-success">';
-    html += row('Status', '&#10003; Stamped &mdash; awaiting confirmation', 'color:var(--success)');
-    if (owner) html += row('Owner', ownerSlot(owner));
+    html += row('Status', '&#10003; Stamped &mdash; awaiting confirmation', SUCCESS_STYLE);
+    if (owner) html += row('Owner', ownerSlot(owner), MONO);
     html += row('Chain', escapeHtml(CHAIN_LABELS[result.chain] || result.chain));
     if (description) html += row('Notes', escapeHtml(description));
-    if (walrusBlobId) html += row('Metadata', escapeHtml(walrusBlobId));
+    if (walrusBlobId) html += row('Metadata', escapeHtml(walrusBlobId), MONO);
     html += '</div>';
     html += '<button id="btn-recheck" class="btn btn-outline btn-full">Check again</button>';
 
