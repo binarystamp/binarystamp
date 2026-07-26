@@ -130,6 +130,7 @@ Copy `.env.example` to `.env` and fill in:
 | `GET` | `/api/ens/resolve/<name>` | Resolve ENS subdomain |
 | `GET` | `/api/ens/reverse/<address>` | Primary ENS name for an address |
 | `POST` | `/api/ens/resolve` | CCIP-Read gateway endpoint |
+| `POST` | `/api/ens` | Same gateway, on the path the deployed resolver uses |
 
 ## Smart Contracts
 

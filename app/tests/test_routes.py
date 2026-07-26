@@ -61,6 +61,7 @@ def test_no_duplicate_rules_anywhere():
     ('/api/sui/stamp-object', 'GET'),
     ('/api/sui/config', 'GET'),
     ('/api/ens/resolve', 'POST'),
+    ('/api/ens', 'POST'),
     ('/api/ens/resolve/<name>', 'GET'),
     ('/api/ens/reverse/<address>', 'GET'),
     ('/api/subgraph/query', 'POST'),

@@ -227,8 +227,14 @@ returning the structured provenance data without prose.
 `binarystamp.eth` resolves subdomains through a CCIP-Read (EIP-3668) gateway
 served by this application.
 
-- `<sha256hash>.binarystamp.eth` → the file's owner
 - `<number>.binarystamp.eth` → the owner of stamp #N
+
+> **`<sha256hash>.binarystamp.eth` does not work through ENS.** A DNS
+> wire-format label is limited to 63 bytes (RFC 1035), and a SHA-256 hex digest
+> is 64 characters — 66 with the `0x` prefix. ENSIP-10 wildcard resolution
+> DNS-encodes the name, so a standard client rejects the name before making any
+> request. Use the stamp number, or `GET /api/ens/resolve/<name>` below, which
+> is our own endpoint and has no such limit.
 
 ### `GET /api/ens/resolve/<name>`
 
@@ -268,12 +274,18 @@ Reverse records live on Ethereum mainnet, so this needs `MAINNET_RPC_URL`
 bytes). Results are cached for `ENS_REVERSE_CACHE_TTL` seconds, misses
 included, since each lookup costs two mainnet calls.
 
-### `POST /api/ens/resolve`
+### `POST /api/ens/resolve` — also served at `POST /api/ens`
 
 The CCIP-Read gateway itself. Called by the resolver contract on Ethereum
 mainnet, not by browsers — the deployed
 [`BinaryStampResolver`](https://etherscan.io/address/0x61DF09Bf03f5693f8928F3aF9364EbC3a4D61D50)
 redirects lookups here.
+
+The deployed resolver holds `https://binarystamp.com/api/ens` as its gateway
+URL, so the gateway answers on that path too. It also sends a bare
+`abi.encode(name, data)` rather than the conventional
+`abi.encodeWithSelector(resolve.selector, name, data)`; both shapes are
+accepted.
 
 ```json
 {"sender": "0x61DF...", "data": "0x9061b923..."}

@@ -64,6 +64,28 @@ def parse_subdomain(name):
     return None
 
 
+def unwrap_resolve_calldata(calldata):
+    """Pull (name, inner calldata) out of a CCIP-Read request body.
+
+    Two shapes reach us. The usual one is selector-prefixed, as produced by
+    abi.encodeWithSelector(resolve.selector, name, data). The deployed
+    BinaryStampResolver instead sends a bare abi.encode(name, data) with no
+    selector, so accept both rather than silently failing on our own resolver.
+    """
+    resolve_selector = keccak(text='resolve(bytes,bytes)')[:4]
+
+    if calldata[:4] == resolve_selector:
+        body = calldata[4:]
+    else:
+        body = calldata
+
+    dns_name, inner_data = decode(['bytes', 'bytes'], body)
+    return decode_dns_name(dns_name), inner_data
+
+
+# The deployed resolver points clients at /api/ens, so serve the gateway there
+# as well as at the canonical /api/ens/resolve.
+@ens_bp.route('/ens', methods=['POST'])
 @ens_bp.route('/ens/resolve', methods=['POST'])
 def ccip_resolve():
     """
@@ -80,19 +102,10 @@ def ccip_resolve():
 
     selector = calldata[:4]
 
-    # Decode the resolve(bytes name, bytes data) call
-    # The outer call is resolve(bytes,bytes) which wraps the inner call
     try:
-        # Try to decode as resolve(bytes,bytes)
-        resolve_selector = keccak(text='resolve(bytes,bytes)')[:4]
-        if calldata[:4] == resolve_selector:
-            dns_name, inner_data = decode(['bytes', 'bytes'], calldata[4:])
-            name = decode_dns_name(dns_name)
-            selector = inner_data[:4]
-            inner_calldata = inner_data
-        else:
-            name = ''
-            inner_calldata = calldata
+        name, inner_data = unwrap_resolve_calldata(calldata)
+        selector = inner_data[:4]
+        inner_calldata = inner_data
     except Exception:
         name = ''
         inner_calldata = calldata
