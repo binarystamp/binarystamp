@@ -81,6 +81,13 @@ AI Agent (provenance analysis via The Graph)
 | Sui Registry (shared object) | Sui Testnet | [`0x2ba5935995d77fcae22d4403084a8f949da03ed49fbcad053cbd4df51c9a713e`](https://suiscan.xyz/testnet/object/0x2ba5935995d77fcae22d4403084a8f949da03ed49fbcad053cbd4df51c9a713e) |
 | ENS Name | Ethereum Mainnet | [`binarystamp.eth`](https://app.ens.domains/binarystamp.eth) |
 
+## Documentation
+
+- [Quickstart](docs/QUICKSTART.md) — running locally and stamping your first file
+- [API Reference](docs/API.md) — HTTP endpoints
+- [Deployment](docs/DEPLOYMENT.md) — production and contract deployment
+- [Technical docs](app/README.md) — architecture and internals
+
 ## Links
 
 - Website: https://binarystamp.com
