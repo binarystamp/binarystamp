@@ -352,6 +352,47 @@ def test_sui_stamp_shows_no_ens_name(results):
     assert results['SUI_STAMP_HAS_NO_ENS_NAME'] == 'true'
 
 
+# ============ Agent answer rendering ============
+
+def test_agent_panel_shown_for_a_stamped_file(results):
+    assert results['AI_PANEL_SHOWN'] == 'true'
+
+
+def test_agent_markdown_table_becomes_a_real_table(results):
+    """Cells used to be emitted with no <table>, collapsing into inline text."""
+    assert results['AI_RENDERS_TABLE'] == 'true'
+    assert results['AI_NO_ORPHAN_CELLS'] == 'true'
+
+
+def test_agent_lists_are_wrapped(results):
+    """Numbered lists were not handled at all and ran together as a paragraph."""
+    assert results['AI_RENDERS_ORDERED_LIST'] == 'true'
+    assert results['AI_RENDERS_BULLET_LIST'] == 'true'
+
+
+def test_agent_headings_and_quotes_render(results):
+    assert results['AI_RENDERS_HEADING'] == 'true'
+    assert results['AI_RENDERS_BLOCKQUOTE'] == 'true'
+
+
+def test_agent_answer_has_no_double_breaks(results):
+    """Blank lines became <br><br>, which is what spread the output out."""
+    assert results['AI_NO_STRAY_BR'] == 'true'
+
+
+def test_agent_answer_escapes_markup(results):
+    """The answer is model output rendered as HTML; it must stay inert."""
+    assert results['AI_ESCAPES_MARKUP'] == 'true'
+
+
+def test_agent_renders_without_errors(results):
+    assert results['AI_ERRORS'] == '0'
+
+
+def test_agent_panel_hidden_when_unconfigured(results):
+    assert results['AI_HIDDEN_WHEN_UNCONFIGURED'] == 'true'
+
+
 # ============ Failure honesty ============
 
 def test_missing_wallet_reports_error(results):

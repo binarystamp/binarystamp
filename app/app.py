@@ -31,6 +31,26 @@ SUI_EVENT_MAX_PAGES = int(os.getenv('SUI_EVENT_MAX_PAGES', '10'))
 # ENS_GATEWAY_URL is read by scripts/deploy_resolver.py, not by the app: this
 # service *is* the gateway, so ens_resolver.py serves the lookups directly.
 
+# The answer renders in a narrow side panel, not a document, so the format
+# instructions matter as much as the persona.
+AI_SYSTEM_PROMPT = (
+    'You are BinaryStamp AI, a provenance analysis agent. You answer questions '
+    'about a file\'s on-chain ownership using the registry data supplied with '
+    'the question.\n'
+    '\n'
+    'Your answer is rendered as Markdown in a narrow panel. Follow these:\n'
+    '- Open with the answer itself, in one or two sentences. No title heading.\n'
+    '- Put facts in a compact two-column Markdown table (| Field | Value |).\n'
+    '- Keep the whole answer under about 150 words unless more is asked for.\n'
+    '- Use no emoji and no decorative symbols. Plain Markdown only.\n'
+    '- Abbreviate hashes and addresses as 0x1234...abcd. The full file hash is '
+    'already displayed above your answer, so do not repeat it in full.\n'
+    '- Write timestamps as human-readable dates, and say how long ago they '
+    'were relative to today.\n'
+    '- State only what the data supports. If a field is absent, say so briefly '
+    'rather than speculating about why.'
+)
+
 # ABI for the EVM mirror contract - load from file, fallback to env
 ABI_FILE = os.path.join(os.path.dirname(__file__), 'contracts', 'evm', 'abi.json')
 if os.path.exists(ABI_FILE):
@@ -358,10 +378,15 @@ def ai_provenance():
             message = client.messages.create(
                 model='claude-sonnet-4-6',
                 max_tokens=1024,
-                system='You are BinaryStamp AI, a provenance analysis agent. You analyze file ownership and history data from The Graph subgraph. Be concise and factual. Format timestamps as human-readable dates.',
+                system=AI_SYSTEM_PROMPT,
                 messages=[{
                     'role': 'user',
-                    'content': f'File hash: {file_hash}\n\nSubgraph data:\n{json.dumps(context, indent=2)}\n\nQuestion: {question}'
+                    'content': (
+                        f'Today is {time.strftime("%Y-%m-%d")}.\n\n'
+                        f'File hash: {file_hash}\n\n'
+                        f'Registry data:\n{json.dumps(context, indent=2)}\n\n'
+                        f'Question: {question}'
+                    )
                 }]
             )
             return jsonify({

@@ -579,33 +579,97 @@ circle.spinner {
 
 .ai-answer {
     margin-top: 12px;
-    padding: 16px;
+    padding: 16px 18px;
     border: 1px solid var(--border);
+    border-radius: var(--radius);
     font-size: 13px;
     line-height: 1.6;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
 }
 
-.ai-answer h3,
-.ai-answer h4 {
-    margin: 12px 0 6px;
-    font-size: 13px;
+.ai-answer > *:first-child { margin-top: 0; }
+.ai-answer > *:last-child { margin-bottom: 0; }
+
+.ai-answer h4,
+.ai-answer h5,
+.ai-answer h6 {
+    margin: 18px 0 8px;
+    font-size: 11px;
     font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
 }
 
-.ai-answer h3:first-child,
-.ai-answer h4:first-child {
-    margin-top: 0;
+.ai-answer p { margin: 0 0 10px; }
+
+.ai-answer ul,
+.ai-answer ol {
+    margin: 0 0 10px;
+    padding-left: 20px;
+}
+
+.ai-answer li { margin: 4px 0; }
+
+/* Facts arrive as a two-column table; match the result panel's rhythm. */
+.ai-answer table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 12px;
+    font-size: 12.5px;
+}
+
+.ai-answer th {
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    padding: 0 12px 6px 0;
+}
+
+.ai-answer td {
+    padding: 7px 12px 7px 0;
+    border-bottom: 1px solid var(--border-light);
+    vertical-align: top;
+}
+
+.ai-answer th:last-child,
+.ai-answer td:last-child { padding-right: 0; }
+
+.ai-answer tr:last-child td { border-bottom: none; }
+
+/* First column reads as a label, like the result panel. */
+.ai-answer td:first-child {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.ai-answer blockquote {
+    margin: 0 0 10px;
+    padding-left: 12px;
+    border-left: 2px solid var(--border);
+    color: var(--text-muted);
 }
 
 .ai-answer code {
-    font-size: 12px;
-    color: var(--text-secondary);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text);
+    background: var(--bg-hover);
+    padding: 1px 4px;
+    border-radius: 3px;
 }
+
+.ai-answer strong { color: var(--text); font-weight: 600; }
 
 .ai-answer hr {
     border: none;
     border-top: 1px solid var(--border-light);
-    margin: 12px 0;
+    margin: 14px 0;
 }
 
 /* ============ Owner with ENS name ============ */

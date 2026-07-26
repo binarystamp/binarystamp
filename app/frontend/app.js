@@ -855,25 +855,114 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// A small block-level Markdown renderer for the agent's answers.
+//
+// The previous version emitted <tr>/<li> with no <table>/<ul> around them, so
+// tables collapsed into a run of inline text and list items lost their
+// structure. This walks the document block by block instead.
+//
+// Input is escaped first, so everything below composes escaped text.
 function simpleMarkdown(text) {
-    let html = escapeHtml(text);
-    // Headers
-    html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
-    html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
-    // Bold
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    // Inline code
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-    // Lists
-    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-    // Tables (simple)
-    html = html.replace(/\|(.+)\|/g, (match) => {
-        if (match.match(/^\|[\s-|]+\|$/)) return '';
-        const cells = match.split('|').filter(c => c.trim());
-        return '<tr>' + cells.map(c => '<td>' + c.trim() + '</td>').join('') + '</tr>';
-    });
-    // Line breaks
-    html = html.replace(/\n\n/g, '<br><br>');
-    html = html.replace(/---/g, '<hr>');
-    return html;
+    const lines = escapeHtml(String(text || '')).replace(/\r\n/g, '\n').split('\n');
+    const out = [];
+    let i = 0;
+
+    const isBlank = l => !l.trim();
+    const isRule = l => /^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(l);
+    const isQuote = l => /^\s*(?:&gt;|>)\s?/.test(l);
+    const isRow = l => /^\s*\|.*\|\s*$/.test(l);
+    const isDivider = l => /^\s*\|[\s:|-]+\|\s*$/.test(l);
+    const RE_UL = /^\s*[-*+]\s+(.*)$/;
+    const RE_OL = /^\s*\d+[.)]\s+(.*)$/;
+
+    function inline(str) {
+        return str
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>');
+    }
+
+    function cells(row) {
+        return row.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+    }
+
+    while (i < lines.length) {
+        const line = lines[i];
+
+        if (isBlank(line)) { i++; continue; }
+
+        if (isRule(line)) { out.push('<hr>'); i++; continue; }
+
+        const heading = line.match(/^\s*(#{1,6})\s+(.*)$/);
+        if (heading) {
+            // Answers sit inside a panel, so headings start small.
+            const level = Math.min(3 + heading[1].length, 6);
+            out.push('<h' + level + '>' + inline(heading[2].trim()) + '</h' + level + '>');
+            i++;
+            continue;
+        }
+
+        // A table is a pipe row followed by a |---|---| divider.
+        if (isRow(line) && i + 1 < lines.length && isDivider(lines[i + 1])) {
+            const head = cells(line);
+            i += 2;
+            const body = [];
+            while (i < lines.length && isRow(lines[i]) && !isDivider(lines[i])) {
+                body.push(cells(lines[i]));
+                i++;
+            }
+            let table = '<table><thead><tr>'
+                + head.map(c => '<th>' + inline(c) + '</th>').join('')
+                + '</tr></thead>';
+            if (body.length) {
+                table += '<tbody>' + body.map(r =>
+                    '<tr>' + r.map(c => '<td>' + inline(c) + '</td>').join('') + '</tr>').join('')
+                    + '</tbody>';
+            }
+            out.push(table + '</table>');
+            continue;
+        }
+
+        if (isQuote(line)) {
+            const parts = [];
+            while (i < lines.length && isQuote(lines[i])) {
+                parts.push(lines[i].replace(/^\s*(?:&gt;|>)\s?/, ''));
+                i++;
+            }
+            out.push('<blockquote>' + inline(parts.join(' ')) + '</blockquote>');
+            continue;
+        }
+
+        if (RE_UL.test(line) || RE_OL.test(line)) {
+            const ordered = RE_OL.test(line);
+            const pattern = ordered ? RE_OL : RE_UL;
+            const items = [];
+            while (i < lines.length && pattern.test(lines[i])) {
+                items.push(lines[i].match(pattern)[1]);
+                i++;
+            }
+            const tag = ordered ? 'ol' : 'ul';
+            out.push('<' + tag + '>'
+                + items.map(t => '<li>' + inline(t) + '</li>').join('')
+                + '</' + tag + '>');
+            continue;
+        }
+
+        // Anything else is a paragraph, running until a blank line or a block
+        // that starts something else.
+        const paragraph = [];
+        while (i < lines.length && !isBlank(lines[i]) && !isRule(lines[i]) && !isQuote(lines[i])
+               && !isRow(lines[i]) && !RE_UL.test(lines[i]) && !RE_OL.test(lines[i])
+               && !/^\s*#{1,6}\s/.test(lines[i])) {
+            paragraph.push(lines[i].trim());
+            i++;
+        }
+        if (paragraph.length) {
+            out.push('<p>' + inline(paragraph.join(' ')) + '</p>');
+        } else {
+            i++;  // nothing consumed; do not spin
+        }
+    }
+
+    return out.join('');
 }

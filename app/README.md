@@ -195,6 +195,23 @@ non-prompting calls — a page load must never open a wallet dialog:
 `accountsChanged` and the Wallet Standard `change` event keep the header in
 sync when the user switches or revokes accounts.
 
+## Provenance Agent
+
+`/api/ai/provenance` gathers a file's registry data and passes it to Claude.
+Two details shape the output rather than the persona:
+
+- The answer renders in a narrow panel, so the system prompt asks for a short
+  lead sentence, a compact two-column table for facts, abbreviated hashes, no
+  emoji, and roughly 150 words.
+- Today's date is included with the question. Without it the model reasons from
+  its training cutoff and reports recent on-chain timestamps as future dates.
+
+`simpleMarkdown` in `frontend/app.js` renders the reply. It is a block-level
+parser — headings, tables, ordered and unordered lists, blockquotes, rules and
+paragraphs — because the answer is Markdown and the earlier line-by-line
+version emitted table cells and list items with no enclosing element. Input is
+escaped before parsing, so model output cannot inject markup.
+
 ## Ownership Transfers
 
 A transfer is offered once a stamp is found, on whichever chain it was found

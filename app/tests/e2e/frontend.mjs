@@ -79,7 +79,7 @@ function makeEvmProvider(captured, opts = {}) {
 }
 
 async function bootPage({withSui, withEvm, lookup, ownedStamp, ensName,
-                         evmAuthorized, suiAuthorized, suiConnectVersion}) {
+                         evmAuthorized, suiAuthorized, suiConnectVersion, aiAnswer}) {
     const html = fs.readFileSync(path.join(FRONTEND, 'index.html'), 'utf8')
         .replace(/<script type="module"[^>]*><\/script>/, '');
 
@@ -104,6 +104,12 @@ async function bootPage({withSui, withEvm, lookup, ownedStamp, ensName,
         }
         if (target.includes('/api/ens/reverse/')) {
             return {ok: true, json: async () => ({name: ensName || null})};
+        }
+        if (target.includes('/api/health')) {
+            return {ok: true, json: async () => ({status: 'ok', ai: Boolean(aiAnswer)})};
+        }
+        if (target.includes('/api/ai/provenance')) {
+            return {ok: true, json: async () => ({answer: aiAnswer || ''})};
         }
         return {ok: true, json: async () => ({})};
     };
@@ -518,6 +524,81 @@ const addressHidden = ctx => ctx.doc.getElementById('wallet-address').classList.
     await dropFile(ctx, 'drop-zone');
     const text = ctx.doc.getElementById('lookup-result').textContent;
     emit('SUI_STAMP_HAS_NO_ENS_NAME', String(!text.includes('.binarystamp.eth')));
+}
+
+// ============ Agent answer rendering ============
+
+// The agent replies in Markdown; it has to arrive as real structure, not a
+// run of inline text.
+{
+    const answer = [
+        'Registered on-chain with a single stamp.',
+        '',
+        '| Field | Value |',
+        '|---|---|',
+        '| Owner | 0x2981...cbc0 |',
+        '| Stamp count | 1 |',
+        '',
+        '### Observations',
+        '',
+        '1. Never transferred.',
+        '2. No description attached.',
+        '',
+        '- Stored on Walrus',
+        '',
+        '> Note: *testnet data.*',
+    ].join('\n');
+
+    const ctx = await bootPage({
+        lookup: {found: true, owner: EVM_ACCOUNT, timestamp: 1700000000, source: 'subgraph'},
+        aiAnswer: answer,
+    });
+    await dropFile(ctx, 'drop-zone');
+    emit('AI_PANEL_SHOWN', String(!ctx.doc.getElementById('ai-panel').classList.contains('hidden')));
+
+    ctx.doc.getElementById('ai-question').value = 'tell me about this file';
+    click(ctx.window, ctx.doc.getElementById('btn-ai-ask'));
+    await new Promise(r => setTimeout(r, 1500));
+
+    const el = ctx.doc.getElementById('ai-answer');
+    const html = el.innerHTML;
+    emit('AI_RENDERS_TABLE', String(el.querySelectorAll('table').length === 1
+        && el.querySelectorAll('th').length === 2
+        && el.querySelectorAll('tbody tr').length === 2));
+    emit('AI_RENDERS_ORDERED_LIST', String(el.querySelectorAll('ol > li').length === 2));
+    emit('AI_RENDERS_BULLET_LIST', String(el.querySelectorAll('ul > li').length === 1));
+    emit('AI_RENDERS_HEADING', String(el.querySelectorAll('h4,h5,h6').length === 1));
+    emit('AI_RENDERS_BLOCKQUOTE', String(el.querySelectorAll('blockquote em').length === 1));
+    emit('AI_NO_STRAY_BR', String(!html.includes('<br><br>')));
+    emit('AI_NO_ORPHAN_CELLS', String(el.querySelectorAll('table tr').length
+        === el.querySelectorAll('tr').length));
+    emit('AI_ERRORS', ctx.errors.length);
+}
+
+// Markup in an answer must not become live markup.
+{
+    const ctx = await bootPage({
+        lookup: {found: true, owner: EVM_ACCOUNT, timestamp: 1700000000, source: 'subgraph'},
+        aiAnswer: 'Careful: <img src=x onerror=alert(1)> and <script>alert(2)</script>',
+    });
+    await dropFile(ctx, 'drop-zone');
+    ctx.doc.getElementById('ai-question').value = 'hi';
+    click(ctx.window, ctx.doc.getElementById('btn-ai-ask'));
+    await new Promise(r => setTimeout(r, 1500));
+
+    const el = ctx.doc.getElementById('ai-answer');
+    emit('AI_ESCAPES_MARKUP', String(el.querySelectorAll('img, script').length === 0
+        && el.textContent.includes('<img')));
+}
+
+// The panel stays hidden when the agent is not configured.
+{
+    const ctx = await bootPage({
+        lookup: {found: true, owner: EVM_ACCOUNT, timestamp: 1700000000, source: 'subgraph'},
+    });
+    await dropFile(ctx, 'drop-zone');
+    emit('AI_HIDDEN_WHEN_UNCONFIGURED',
+        String(ctx.doc.getElementById('ai-panel').classList.contains('hidden')));
 }
 
 console.log(out.join('\n'));
