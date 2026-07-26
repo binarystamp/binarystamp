@@ -424,7 +424,9 @@ input[type="checkbox"] {
 }
 
 /* ============ Spinner ============ */
-@keyframes spin { to { transform: rotate(360deg); } }
+/* Negative angle: CSS rotates clockwise for positive values, so this spins
+   counter-clockwise. */
+@keyframes spin { to { transform: rotate(-360deg); } }
 .spinner { animation: spin 0.8s linear infinite; }
 
 /* ============ Utilities ============ */
