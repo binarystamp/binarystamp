@@ -454,6 +454,23 @@ function showTransferResult(el, success, data) {
         + '</div>';
 }
 
+// ============ ENS names for a stamp ============
+
+// A SHA-256 hex label is 64 characters and DNS caps labels at 63, so the ENS
+// name uses base36 — the same 256 bits in 50 characters. Fixed width, so a
+// hash with leading zero bytes cannot encode short and collide.
+const BASE36_LABEL_LENGTH = 50;
+const ENS_ROOT = '.binarystamp.eth';
+
+function ensNameForHash(hash) {
+    const clean = hash.startsWith('0x') ? hash : '0x' + hash;
+    return BigInt(clean).toString(36).padStart(BASE36_LABEL_LENGTH, '0') + ENS_ROOT;
+}
+
+function ensNameForStampNumber(number) {
+    return String(number) + ENS_ROOT;
+}
+
 // ============ Owner display ============
 
 // ENS reverse records are opt-in, so most addresses have none. Render the
@@ -578,6 +595,11 @@ const SOURCE_LABELS = {
     sui: 'Sui Testnet',
 };
 
+function ensLink(name) {
+    return '<a href="https://app.ens.domains/' + encodeURIComponent(name)
+        + '" target="_blank" rel="noopener">' + escapeHtml(name) + '</a>';
+}
+
 function showLookupResult(data, hash) {
     const el = document.getElementById('lookup-result');
     el.classList.remove('hidden');
@@ -615,6 +637,17 @@ function showLookupResult(data, hash) {
         html += row('Metadata', '<a href="' + API + '/api/walrus/fetch/'
             + encodeURIComponent(data.walrusBlobId) + '" target="_blank" rel="noopener">'
             + escapeHtml(data.walrusBlobId) + '</a>');
+    }
+
+    // ENS resolution goes through the subgraph, so names only exist for
+    // stamps on Base — a Sui stamp has no ENS name.
+    if (data.source === 'subgraph' || data.source === 'contract') {
+        const number = data.stampNumber
+            || (data.stamps && data.stamps.length && data.stamps[0].stampNumber);
+        if (number) {
+            html += row('ENS name', ensLink(ensNameForStampNumber(number)));
+        }
+        html += row('ENS from hash', ensLink(ensNameForHash(hash)));
     }
 
     if (data.stamps && data.stamps.length > 1) {

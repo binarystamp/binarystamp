@@ -227,14 +227,27 @@ returning the structured provenance data without prose.
 `binarystamp.eth` resolves subdomains through a CCIP-Read (EIP-3668) gateway
 served by this application.
 
+- `<base36hash>.binarystamp.eth` → the file's owner
 - `<number>.binarystamp.eth` → the owner of stamp #N
 
-> **`<sha256hash>.binarystamp.eth` does not work through ENS.** A DNS
-> wire-format label is limited to 63 bytes (RFC 1035), and a SHA-256 hex digest
-> is 64 characters — 66 with the `0x` prefix. ENSIP-10 wildcard resolution
-> DNS-encodes the name, so a standard client rejects the name before making any
-> request. Use the stamp number, or `GET /api/ens/resolve/<name>` below, which
-> is our own endpoint and has no such limit.
+The hash label is the digest in **base36, padded to 50 characters**, not hex.
+A DNS wire-format label is capped at 63 bytes (RFC 1035) and a SHA-256 hex
+digest is 64 characters, so a hex label is rejected by ENS clients before any
+request is made. Base36 carries the same 256 bits in 50 characters.
+
+```
+hash   0xd3ab18b78082d3b4f768779c3dbd163155cfbfbbbd7eaeb8da6497745f401274
+name   59x6n7u66bsd6bzlsnpk2izswbpf7vljhtguldnk8adldrpkdw.binarystamp.eth
+```
+
+The padding is required: without a fixed width, a hash with leading zero bytes
+would encode shorter and stop mapping one-to-one onto names.
+
+Both forms are equivalent — the base36 name is derivable from the file alone,
+while the stamp number is shorter but has to be looked up first.
+
+`GET /api/ens/resolve/<name>` additionally accepts a plain hex label, since it
+is our own endpoint and not bound by the DNS limit.
 
 ### `GET /api/ens/resolve/<name>`
 

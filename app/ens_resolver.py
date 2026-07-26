@@ -225,6 +225,59 @@ def decode_dns_name(data):
     return '.'.join(labels)
 
 
+# A SHA-256 hex digest is 64 characters, and DNS wire-format labels are capped
+# at 63 bytes (RFC 1035), so a hex label can never be resolved by an ENS client.
+# Base36 packs the same 256 bits into 50 characters, which fits.
+BASE36_DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz'
+BASE36_LABEL_LENGTH = 50  # ceil(256 / log2(36))
+
+HEX_64 = re.compile(r'^[0-9a-f]{64}$')
+BASE36_LABEL = re.compile(r'^[0-9a-z]{%d}$' % BASE36_LABEL_LENGTH)
+
+
+def hash_to_label(file_hash):
+    """Encode a 32-byte hash as the 50-character base36 label for its name."""
+    value = int(file_hash, 16)
+    if value < 0 or value >= 1 << 256:
+        raise ValueError('hash out of range')
+
+    out = ''
+    while value:
+        value, remainder = divmod(value, 36)
+        out = BASE36_DIGITS[remainder] + out
+
+    # Fixed width, so a hash with leading zero bytes cannot encode short and
+    # collide with a different hash.
+    return out.rjust(BASE36_LABEL_LENGTH, '0')
+
+
+def label_to_hash(label):
+    """Decode a subdomain label back to a 0x file hash, or None.
+
+    Accepts the base36 form used in real ENS names, and plain hex for the
+    app's own lookup endpoint, which is not bound by the DNS label limit.
+    """
+    if not label:
+        return None
+
+    label = label.lower()
+    if label.startswith('0x'):
+        label = label[2:]
+
+    if HEX_64.match(label):
+        return '0x' + label
+
+    # Checked before the digits-only stamp-number case: a base36 label can be
+    # all digits, and length is what tells them apart.
+    if BASE36_LABEL.match(label):
+        value = int(label, 36)
+        if value >= 1 << 256:
+            return None
+        return '0x' + format(value, '064x')
+
+    return None
+
+
 def resolve_owner(label):
     """Resolve a label to an owner address."""
     if not label:
@@ -232,13 +285,11 @@ def resolve_owner(label):
 
     import requests as req
 
-    # Check if label is a file hash
-    file_hash = label
-    if not file_hash.startswith('0x'):
-        # Could be a stamp number
+    file_hash = label_to_hash(label)
+    if file_hash is None:
         if label.isdigit():
             return resolve_owner_by_number(int(label))
-        file_hash = '0x' + file_hash
+        return None
 
     if not SUBGRAPH_URL:
         return None
@@ -299,9 +350,13 @@ def resolve_text(label, key):
         return ''
 
     import requests as req
-    file_hash = label if label.startswith('0x') else '0x' + label
+    file_hash = label_to_hash(label)
+    by_number = file_hash is None and label.isdigit()
 
-    if label.isdigit():
+    if not file_hash and not by_number:
+        return ''
+
+    if by_number:
         query = '''
         query($id: ID!) {
             stamp(id: $id) {
@@ -338,7 +393,7 @@ def resolve_text(label, key):
         )
         data = resp.json().get('data', {})
 
-        if label.isdigit():
+        if by_number:
             stamp = data.get('stamp', {})
         else:
             lookup = data.get('fileHashLookup', {})

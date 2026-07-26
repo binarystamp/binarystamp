@@ -230,6 +230,7 @@ Indexes `StampCreated` and `StampTransferred` events from the EVM contract. Enti
 `binarystamp.eth` uses a custom CCIP-Read resolver:
 
 - `<sha256hash>.binarystamp.eth` resolves to the file's owner address
+- `<base36hash>.binarystamp.eth` resolves to the file's owner
 - `<number>.binarystamp.eth` resolves to the owner of stamp #N
 - Resolution queries The Graph subgraph via the gateway
 

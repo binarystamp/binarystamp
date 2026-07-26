@@ -111,8 +111,17 @@ You need testnet funds to pay gas:
 
 ### ENS names
 
-Pasting `<hash>.binarystamp.eth` resolves the name to its owner. A name is not
-a hash, so no claim or transfer is offered for one.
+Every stamp on Base has two ENS names, both shown on the result and both
+resolving to the owner in any ENS-aware wallet or explorer:
+
+- `<base36hash>.binarystamp.eth` — derivable from the file alone
+- `<number>.binarystamp.eth` — shorter, but you have to look the stamp up first
+
+The hash label is base36 rather than hex because DNS labels are capped at 63
+bytes and a hex digest is 64 characters.
+
+Pasting either name here resolves it to its owner. A name is not a hash, so no
+claim or transfer is offered for one.
 
 ## Server-side stamping
 

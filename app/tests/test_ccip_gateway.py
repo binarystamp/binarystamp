@@ -139,11 +139,29 @@ def test_gateway_is_post_only(client, path):
 
 # ============ Label length ============
 
-def test_sha256_label_exceeds_the_dns_limit():
-    """A 64-char hex label cannot be DNS-encoded, so <hash>.binarystamp.eth
-    is unreachable through any standard ENS client. Recorded so the
-    limitation is not rediscovered as a gateway bug."""
+def test_hex_label_would_exceed_the_dns_limit():
+    """Why hash labels are base36: a hex digest cannot be DNS-encoded at all."""
     file_hash = 'd3ab18b78082d3b4f768779c3dbd163155cfbfbbbd7eaeb8da6497745f401274'
     assert len(file_hash) == 64
     assert len(file_hash) > 63          # RFC 1035 label limit
     assert len('0x' + file_hash) == 66  # worse with the 0x prefix
+
+    from ens_resolver import hash_to_label
+    assert len(hash_to_label('0x' + file_hash)) <= 63
+
+
+def test_gateway_resolves_a_base36_label(client, monkeypatch):
+    """The end-to-end shape: a real ENS client sends the base36 label."""
+    from ens_resolver import hash_to_label
+    label = hash_to_label('0xd3ab18b78082d3b4f768779c3dbd163155cfbfbbbd7eaeb8da6497745f401274')
+
+    seen = []
+    monkeypatch.setattr(ens_resolver, 'resolve_owner',
+                        lambda lbl: seen.append(lbl) or OWNER)
+
+    resp = post(client, '/api/ens', bare_calldata(label + '.binarystamp.eth', inner_addr_call()))
+    assert resp.status_code == 200
+    assert seen == [label]
+
+    returned = decode(['address'], bytes.fromhex(resp.get_json()['data'][2:]))[0]
+    assert returned.lower() == OWNER.lower()

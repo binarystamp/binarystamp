@@ -398,8 +398,11 @@ async function transfer(ctx, newOwner) {
     await dropFile(ctx, 'drop-zone');
     await new Promise(r => setTimeout(r, 600));
     const text = ctx.doc.getElementById('lookup-result').textContent;
+    // Scope this to the owner field: the panel legitimately contains
+    // .binarystamp.eth name rows, which are not the owner's name.
+    const ownerCell = ctx.doc.querySelector('[id^="owner-slot-"]');
     emit('NO_ENS_SHOWS_ADDRESS', String(text.includes(EVM_ACCOUNT)));
-    emit('NO_ENS_NO_STRAY_DOT_ETH', String(!/\.eth/.test(text)));
+    emit('NO_ENS_NO_STRAY_DOT_ETH', String(!/\.eth/.test(ownerCell ? ownerCell.textContent : text)));
 }
 
 // A Sui owner must not trigger an Ethereum-only lookup at all.
@@ -483,6 +486,33 @@ const addressHidden = ctx => ctx.doc.getElementById('wallet-address').classList.
     ctx.window.ethereum._emit('accountsChanged', ['0x9999999999999999999999999999999999999999']);
     await new Promise(r => setTimeout(r, 200));
     emit('SWITCH_UPDATES_ADDRESS', String(walletText(ctx).includes('0x9999')));
+}
+
+// ============ ENS names for a stamp ============
+
+// The base36 name is derivable from the file alone, so it must be shown.
+{
+    const ctx = await bootPage({
+        lookup: {found: true, owner: EVM_ACCOUNT, timestamp: 1700000000,
+                 source: 'subgraph', stampNumber: '3'},
+    });
+    await dropFile(ctx, 'drop-zone');
+    const text = ctx.doc.getElementById('lookup-result').textContent;
+    // base36 of the SHA-256 of "hello", fixed to 50 characters
+    const expected = BigInt(HELLO_SHA256).toString(36).padStart(50, '0') + '.binarystamp.eth';
+    emit('ENS_HASH_NAME_SHOWN', String(text.includes(expected)));
+    emit('ENS_HASH_LABEL_FITS_DNS', String(expected.split('.')[0].length <= 63));
+    emit('ENS_NUMBER_NAME_SHOWN', String(text.includes('3.binarystamp.eth')));
+}
+
+// A Sui stamp has no ENS name: resolution runs through the subgraph.
+{
+    const ctx = await bootPage({
+        lookup: {found: true, owner: SUI_ACCOUNT.address, timestamp: 1700000000, source: 'sui'},
+    });
+    await dropFile(ctx, 'drop-zone');
+    const text = ctx.doc.getElementById('lookup-result').textContent;
+    emit('SUI_STAMP_HAS_NO_ENS_NAME', String(!text.includes('.binarystamp.eth')));
 }
 
 console.log(out.join('\n'));

@@ -326,6 +326,26 @@ def test_switching_account_updates_the_header(results):
     assert results['SWITCH_UPDATES_ADDRESS'] == 'true'
 
 
+# ============ ENS names for a stamp ============
+
+def test_hash_derived_ens_name_is_shown(results):
+    """Derivable from the file alone, so it has to be visible to be usable."""
+    assert results['ENS_HASH_NAME_SHOWN'] == 'true'
+
+
+def test_shown_ens_label_fits_the_dns_limit(results):
+    assert results['ENS_HASH_LABEL_FITS_DNS'] == 'true'
+
+
+def test_stamp_number_ens_name_is_shown(results):
+    assert results['ENS_NUMBER_NAME_SHOWN'] == 'true'
+
+
+def test_sui_stamp_shows_no_ens_name(results):
+    """ENS resolution runs through the subgraph, which only indexes Base."""
+    assert results['SUI_STAMP_HAS_NO_ENS_NAME'] == 'true'
+
+
 # ============ Failure honesty ============
 
 def test_missing_wallet_reports_error(results):

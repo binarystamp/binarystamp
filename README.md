@@ -10,7 +10,7 @@ BinaryStamp lets anyone register the SHA-256 hash of any file on a blockchain, c
 - **Client-Side Hashing** — SHA-256 in the browser; the file itself is never uploaded
 - **Multi-Chain** — Stamp on Base (EVM), Sui, or both at once — signed by your own wallet
 - **Walrus Storage** — Metadata stored on Walrus decentralized blob storage
-- **ENS Resolution** — Resolve `<hash>.binarystamp.eth` to its owner via CCIP-Read
+- **ENS Resolution** — Every stamp gets a real ENS name resolving to its owner via CCIP-Read
 - **The Graph Indexing** — All stamps indexed for instant lookups and history
 - **AI Provenance Agent** — Ask questions about any file's ownership chain
 - **Ownership Transfers** — Transfer stamp ownership to another address
@@ -36,7 +36,7 @@ for Sui. Your wallet signs the transaction, so the stamp is owned by you.
 3. **Store** — Optional metadata stored on Walrus
 4. **Stamp** — Unclaimed hashes can be registered on-chain (Base / Sui)
 5. **Transfer** — Stamps can be handed to another address
-6. **Resolve** — `<hash>.binarystamp.eth` resolves to the owner address
+6. **Resolve** — `<base36-hash>.binarystamp.eth` and `<number>.binarystamp.eth` resolve to the owner
 
 ## Architecture
 
