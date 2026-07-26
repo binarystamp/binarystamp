@@ -3,3 +3,8 @@ gunicorn==23.0.0
 web3==7.6.0
 requests==2.32.3
 anthropic==0.52.0
+
+# Imported directly by ens_resolver.py. They arrive transitively with web3,
+# but a direct import deserves a direct, pinned declaration.
+eth-abi==5.2.0
+eth-utils==6.0.0

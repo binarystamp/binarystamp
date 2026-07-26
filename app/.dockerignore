@@ -1,0 +1,39 @@
+# Build context excludes. Without this, `COPY . .` ships ~436MB, of which
+# venv/ and node_modules/ are the bulk — and a host-built venv carries
+# absolute paths and host binaries that must never end up in an image.
+#
+# Patterns are matched from the context root, so a bare `node_modules/` would
+# only catch the top-level one. `**/` is required to reach nested copies such
+# as contracts/evm/subgraph/node_modules.
+
+**/venv/
+**/.venv/
+**/node_modules/
+
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+
+# Secrets never belong in an image layer.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Not needed at runtime: tests run against a local venv, and the bundler is
+# only used to regenerate frontend/vendor/sui.js, which is committed.
+tests/
+scripts/sui-entry.js
+package.json
+package-lock.json
+
+# Subgraph and contract sources are deploy-time artifacts, not runtime ones.
+# contracts/evm/abi.json is loaded at import, so contracts/ itself stays.
+contracts/evm/subgraph/
+
+**/.git/
+**/.gitignore
+**/.idea/
+**/.vscode/
+**/*.swp
+**/.DS_Store

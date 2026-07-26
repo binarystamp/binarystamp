@@ -1,0 +1,6 @@
+# Development only — not installed in the image.
+-r requirements.txt
+
+pytest==9.1.1
+# Used by the deploy scripts in scripts/, which run from a local venv.
+python-dotenv==1.2.2

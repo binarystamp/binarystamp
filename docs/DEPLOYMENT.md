@@ -27,6 +27,17 @@ Compose publishes port 8082, mounts `./data` at `/data`, restarts unless
 stopped, and health-checks `/api/health`. Put a TLS-terminating reverse proxy
 in front of it.
 
+`_start` uses the Compose v2 plugin (`docker compose`) when present and falls
+back to the standalone v1 binary (`docker-compose`). The file keeps its
+`version:` key because v1 needs it — without one, v1 reads the file in its
+legacy format, treats `services` as a service name, and fails with
+*"Unsupported config option for services"*. Compose v2 ignores the key.
+
+`app/.dockerignore` keeps the build context at roughly a third of a megabyte.
+Without it `COPY . .` ships `venv/` and every `node_modules/`, around 436MB —
+and a host-built virtualenv in an image is worse than merely large, since its
+absolute paths and host binaries do not apply inside the container.
+
 Two things worth knowing before shipping:
 
 **`.env` is gitignored.** It is never part of a deploy. Production values must
@@ -73,6 +84,10 @@ that feature is unconfigured, not that it is broken.
 | `ENS_GATEWAY_URL` | no | Read by `deploy_resolver.py` only, not by the app |
 | `ANTHROPIC_API_KEY` | no | Without it the AI agent returns data without prose |
 | `LOG_LEVEL` | no | `debug`, `info`, `warning`, `error` |
+
+Runtime dependencies are pinned in `app/requirements.txt`; `pytest` and the
+deploy scripts' `python-dotenv` live in `app/requirements-dev.txt` and are
+deliberately absent from the image.
 
 > **`PRIVATE_KEY` in production.** It makes `POST /api/stamp` sign with the
 > server's key, so stamps created through it are owned by the server rather
