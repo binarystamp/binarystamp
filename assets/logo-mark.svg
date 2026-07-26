@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="BinaryStamp">
+  <title>BinaryStamp</title>
+  <!-- The header mark, scaled proportionally: the rect occupies 62.5% of the
+       tile, leaving the margin an icon needs, and inner ratios are preserved. -->
+  <g fill="none" stroke="currentColor" stroke-width="24" stroke-linecap="square">
+    <rect x="96" y="96" width="320" height="320" rx="46"/>
+    <circle cx="256" cy="256" r="69"/>
+    <line x1="187" y1="187" x2="325" y2="325"/>
+  </g>
+</svg>

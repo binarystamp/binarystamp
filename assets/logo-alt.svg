@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="BinaryStamp">
+  <title>BinaryStamp</title>
+  <rect width="512" height="512" fill="#0a0a0a"/>
+  <g fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="square">
+    <rect x="96" y="96" width="320" height="320" rx="46"/>
+    <line x1="142" y1="142" x2="370" y2="370"/>
+    <!-- Filled with the background so the diagonal passes behind: the circle
+         reads as a seal laid over the stroke, not a bar drawn through it. -->
+    <circle cx="256" cy="256" r="69" fill="#0a0a0a"/>
+  </g>
+</svg>

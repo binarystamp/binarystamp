@@ -1,6 +1,45 @@
 # Assets
 
-Splash screen, 16:9.
+## Logo
+
+Square mark, 512×512.
+
+| File | Size | Use |
+|------|------|-----|
+| `logo.svg` | vector | Dark tile — the master |
+| `logo.png` | 512×512 | Dark raster |
+| `logo@2x.png` | 1024×1024 | Dark, for app-icon slots that want 1024 |
+| `logo-light.svg` / `.png` / `@2x.png` | | Light variant |
+| `logo-mark.svg` | vector | Transparent, `currentColor` — for inlining beside text, as the app header does |
+
+The mark is the app header's, scaled proportionally: the rounded rect occupies
+62.5% of the tile, leaving the margin an icon needs, and the inner ratios
+(corner radius, circle radius, stroke weight, diagonal endpoints) are derived
+from the 32px original rather than eyeballed.
+
+### A note on the alternative
+
+Isolated at icon size, a circle with a diagonal through its centre reads as a
+prohibition sign — "no entry" — which is the opposite of what the product
+means. It is much weaker in the header, where the mark is small and sits beside
+the wordmark.
+
+`logo-alt.*` keeps every proportion but carries the diagonal to the corners of
+the frame and lets the circle sit **over** it, filled with the background. The
+circle then reads as a seal laid on a stroke rather than a bar drawn through a
+circle. Same geometry, no negation.
+
+It is not the default, because changing a brand mark is not a change to make
+silently. To adopt it, replace `logo.svg` with `logo-alt.svg` and update the
+header mark in `app/frontend/index.html` to match.
+
+Note that the alternative's circle is filled with the page background, so it
+needs the correct fill per theme — which is why there is no transparent
+`currentColor` version of it.
+
+## Splash screen
+
+16:9.
 
 | File | Size | Use |
 |------|------|-----|

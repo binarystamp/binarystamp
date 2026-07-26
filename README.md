@@ -90,8 +90,8 @@ ENS CCIP-Read Gateway <--- binarystamp.eth subdomains
 
 ## Assets
 
-Splash screens in [`assets/`](assets/) — 16:9, dark and light, SVG plus 640×360
-and 1280×720 PNG.
+Logo (512×512) and 16:9 splash screens in [`assets/`](assets/) — dark and light,
+SVG plus PNG at 1x and 2x.
 
 ## Documentation
 
