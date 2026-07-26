@@ -40,22 +40,48 @@ jobs:
           cd sui-package
           sui move build
 
+      - name: Run Move Tests
+        run: |
+          cd sui-package
+          sui move test
+
       - name: Publish to Sui Testnet
         run: |
           cd sui-package
           sui client publish --gas-budget 200000000 --json | tee /tmp/publish-result.json
-          python3 -c "
-          import json
+          python3 - <<'EOF'
+          import json, os
+
           data = json.load(open('/tmp/publish-result.json'))
+          package_id = ''
+          registry_id = ''
+          registry_version = ''
+
           for obj in data.get('objectChanges', []):
               if obj.get('type') == 'published':
-                  pid = obj['packageId']
-                  print(f'PACKAGE_ID={pid}')
-                  open('/tmp/package-id.txt','w').write(pid)
-                  break
-          "
-          echo "## Sui Package Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "Package ID: $(cat /tmp/package-id.txt 2>/dev/null || echo UNKNOWN)" >> $GITHUB_STEP_SUMMARY
+                  package_id = obj['packageId']
+              # The shared Registry is created by init and is required to call
+              # stamp() - a publish is unusable without its object ID.
+              elif obj.get('type') == 'created' and obj.get('objectType', '').endswith('::stamp::Registry'):
+                  registry_id = obj['objectId']
+                  owner = obj.get('owner') or {}
+                  if isinstance(owner, dict):
+                      registry_version = str(owner.get('Shared', {}).get('initial_shared_version', ''))
+
+          summary = os.environ['GITHUB_STEP_SUMMARY']
+          with open(summary, 'a') as f:
+              f.write('## Sui Package Deployed\n\n')
+              f.write('| Key | Value |\n|---|---|\n')
+              f.write(f'| `SUI_PACKAGE_ID` | `{package_id or "UNKNOWN"}` |\n')
+              f.write(f'| `SUI_REGISTRY_ID` | `{registry_id or "UNKNOWN"}` |\n')
+              f.write(f'| Registry initial shared version | `{registry_version or "UNKNOWN"}` |\n\n')
+              f.write('Update `.env`, `.env.example`, `README.md`, and the\n')
+              f.write('`SUI_PACKAGE`/`SUI_REGISTRY`/`SUI_REGISTRY_VERSION` constants in\n')
+              f.write('`app/frontend/chains.js` with these values.\n')
+
+          if not package_id or not registry_id:
+              raise SystemExit('publish did not yield both a package ID and a Registry object ID')
+          EOF
 
       - name: Upload Result
         if: always()
