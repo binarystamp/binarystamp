@@ -7,7 +7,7 @@ BinaryStamp lets anyone register the SHA-256 hash of any file on a blockchain, c
 ## Features
 
 - **Drag & Drop Stamping** — Hash any file client-side, register it on-chain in one click
-- **Multi-Chain** — Stamps on Base (EVM) with Sui support
+- **Multi-Chain** — Stamp on Base (EVM), Sui, or both at once — signed by your own wallet
 - **Walrus Storage** — Metadata stored on Walrus decentralized blob storage
 - **ENS Resolution** — Resolve `<hash>.binarystamp.eth` to its owner via CCIP-Read
 - **The Graph Indexing** — All stamps indexed for instant lookups and history
@@ -24,6 +24,9 @@ cp .env.example .env    # Configure your keys
 ```
 
 Open http://localhost:8082
+
+Stamping needs a browser wallet: MetaMask for Base, a Wallet-Standard Sui wallet
+for Sui. Your wallet signs the transaction, so the stamp is owned by you.
 
 ## How It Works
 
@@ -75,6 +78,7 @@ AI Agent (provenance analysis via The Graph)
 | ENS CCIP-Read Resolver | Ethereum Mainnet | [`0x61DF09Bf03f5693f8928F3aF9364EbC3a4D61D50`](https://etherscan.io/address/0x61DF09Bf03f5693f8928F3aF9364EbC3a4D61D50) |
 | Subgraph | The Graph (Base Sepolia) | [`binarystamp/binarystamp`](https://api.studio.thegraph.com/query/1757003/binarystamp/v0.0.1) |
 | BinaryStamp (Sui Move) | Sui Testnet | [`0xbc097815add0220a26bc2dff1b5b1184924828d9f14cfd835f2ccc25b8faabf7`](https://suiscan.xyz/testnet/object/0xbc097815add0220a26bc2dff1b5b1184924828d9f14cfd835f2ccc25b8faabf7) |
+| Sui Registry (shared object) | Sui Testnet | [`0xdf81de0890d624390235c1808d16f8a1e726b796e25cd0c159b9b4088371c6c1`](https://suiscan.xyz/testnet/object/0xdf81de0890d624390235c1808d16f8a1e726b796e25cd0c159b9b4088371c6c1) |
 | ENS Name | Ethereum Mainnet | [`binarystamp.eth`](https://app.ens.domains/binarystamp.eth) |
 
 ## Links

@@ -24,6 +24,10 @@ SUBGRAPH_URL = os.getenv('SUBGRAPH_URL', '')
 WALRUS_AGGREGATOR = os.getenv('WALRUS_AGGREGATOR', 'https://aggregator.walrus-testnet.walrus.space')
 WALRUS_PUBLISHER = os.getenv('WALRUS_PUBLISHER', 'https://publisher.walrus-testnet.walrus.space')
 SUI_RPC = os.getenv('SUI_RPC', 'https://fullnode.testnet.sui.io:443')
+SUI_PACKAGE_ID = os.getenv('SUI_PACKAGE_ID', '')
+SUI_REGISTRY_ID = os.getenv('SUI_REGISTRY_ID', '')
+SUI_EVENT_PAGE_SIZE = int(os.getenv('SUI_EVENT_PAGE_SIZE', '50'))
+SUI_EVENT_MAX_PAGES = int(os.getenv('SUI_EVENT_MAX_PAGES', '10'))
 ENS_GATEWAY_URL = os.getenv('ENS_GATEWAY_URL', '')
 
 # ABI for the EVM mirror contract - load from file, fallback to env
@@ -102,11 +106,77 @@ def lookup():
                     'description': stamp_data[5],
                     'source': 'contract'
                 })
-            return jsonify({'found': False})
         except Exception as e:
             log.error(f'Contract lookup failed: {e}')
 
+    # Not on Base — the file may have been stamped on Sui instead.
+    if SUI_PACKAGE_ID:
+        try:
+            stamp = query_sui_stamp(file_hash)
+            if stamp:
+                return jsonify(stamp)
+        except Exception as e:
+            log.error(f'Sui lookup failed: {e}')
+
     return jsonify({'found': False, 'source': 'none'})
+
+
+@app.route('/api/sui/lookup', methods=['GET'])
+def sui_lookup():
+    """Look up a file hash in the Sui StampCreated event log."""
+    file_hash = request.args.get('hash', '')
+    if not file_hash:
+        return jsonify({'error': 'hash parameter required'}), 400
+
+    if not SUI_PACKAGE_ID:
+        return jsonify({'found': False, 'error': 'Sui not configured'}), 503
+
+    try:
+        stamp = query_sui_stamp(file_hash)
+    except Exception as e:
+        log.error(f'Sui lookup failed: {e}')
+        return jsonify({'found': False, 'error': str(e)}), 502
+
+    if not stamp:
+        return jsonify({'found': False, 'source': 'sui'})
+    return jsonify(stamp)
+
+
+@app.route('/api/sui/stamp-object', methods=['GET'])
+def sui_stamp_object():
+    """Find the Stamp object an address holds for a file hash.
+
+    transfer_stamp() acts on the object, not the hash, so the frontend needs
+    this before it can build a transfer.
+    """
+    address = request.args.get('address', '')
+    file_hash = request.args.get('hash', '')
+    if not address or not file_hash:
+        return jsonify({'error': 'address and hash parameters required'}), 400
+
+    if not SUI_PACKAGE_ID:
+        return jsonify({'found': False, 'error': 'Sui not configured'}), 503
+
+    try:
+        object_id = find_sui_stamp_object(address, file_hash)
+    except Exception as e:
+        log.error(f'Sui owned-object lookup failed: {e}')
+        return jsonify({'found': False, 'error': str(e)}), 502
+
+    if not object_id:
+        return jsonify({'found': False})
+    return jsonify({'found': True, 'objectId': object_id})
+
+
+@app.route('/api/sui/config', methods=['GET'])
+def sui_config():
+    """Identifiers the frontend needs to build a Sui transaction."""
+    return jsonify({
+        'rpc': SUI_RPC,
+        'packageId': SUI_PACKAGE_ID,
+        'registryId': SUI_REGISTRY_ID,
+        'configured': bool(SUI_PACKAGE_ID and SUI_REGISTRY_ID),
+    })
 
 
 @app.route('/api/stamp', methods=['POST'])
@@ -356,7 +426,147 @@ def health():
         'subgraph': bool(SUBGRAPH_URL),
         'walrus': bool(WALRUS_PUBLISHER),
         'ai': bool(os.getenv('ANTHROPIC_API_KEY')),
+        'sui': bool(SUI_PACKAGE_ID and SUI_REGISTRY_ID),
     })
+
+
+# ============ Sui Helpers ============
+
+def sui_rpc(method, params):
+    """Call the Sui JSON-RPC endpoint."""
+    resp = requests.post(
+        SUI_RPC,
+        json={'jsonrpc': '2.0', 'id': 1, 'method': method, 'params': params},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    if 'error' in body:
+        raise RuntimeError(body['error'].get('message', 'Sui RPC error'))
+    return body.get('result')
+
+
+def bytes_field_to_hex(value):
+    """Move vector<u8> arrives as a list of ints; normalize to 0x-hex."""
+    if isinstance(value, list):
+        return '0x' + bytes(value).hex()
+    if isinstance(value, str):
+        return value if value.startswith('0x') else '0x' + value
+    return ''
+
+
+def query_sui_stamp(file_hash):
+    """Find the earliest StampCreated event matching a file hash.
+
+    Sui RPC cannot filter events by field value, so this scans the package's
+    event log newest-first. Bounded to keep the request predictable; a busy
+    registry would want a proper indexer instead.
+    """
+    if not file_hash.startswith('0x'):
+        file_hash = '0x' + file_hash
+    target = file_hash.lower()
+
+    event_type = f'{SUI_PACKAGE_ID}::stamp::StampCreated'
+    cursor = None
+    match = None
+
+    for _ in range(SUI_EVENT_MAX_PAGES):
+        result = sui_rpc('suix_queryEvents', [
+            {'MoveEventType': event_type}, cursor, SUI_EVENT_PAGE_SIZE, True,
+        ])
+        if not result:
+            break
+
+        for event in result.get('data', []):
+            parsed = event.get('parsedJson', {})
+            if bytes_field_to_hex(parsed.get('file_hash')).lower() != target:
+                continue
+            # Descending scan, so keep overwriting to end up with the earliest.
+            match = {
+                'found': True,
+                'source': 'sui',
+                'fileHash': target,
+                'owner': parsed.get('owner'),
+                'timestamp': int(parsed.get('timestamp_ms', 0)) // 1000,
+                'metadataHash': bytes_field_to_hex(parsed.get('metadata_hash')),
+                'stampId': parsed.get('stamp_id'),
+                'txDigest': event.get('id', {}).get('txDigest'),
+            }
+
+        if not result.get('hasNextPage'):
+            break
+        cursor = result.get('nextCursor')
+
+    if match:
+        current_owner = latest_sui_owner(target)
+        if current_owner:
+            match['owner'] = current_owner
+            match['transferred'] = True
+
+    return match
+
+
+def latest_sui_owner(file_hash):
+    """Replay StampTransferred events to find who holds a stamp now.
+
+    The shared StampRecord keeps the original owner, so a transferred stamp
+    would otherwise report stale ownership.
+    """
+    event_type = f'{SUI_PACKAGE_ID}::stamp::StampTransferred'
+    cursor = None
+    owner = None
+
+    for _ in range(SUI_EVENT_MAX_PAGES):
+        result = sui_rpc('suix_queryEvents', [
+            {'MoveEventType': event_type}, cursor, SUI_EVENT_PAGE_SIZE, False,
+        ])
+        if not result:
+            break
+
+        for event in result.get('data', []):
+            parsed = event.get('parsedJson', {})
+            if bytes_field_to_hex(parsed.get('file_hash')).lower() != file_hash.lower():
+                continue
+            # Ascending scan, so the last match is the most recent transfer.
+            owner = parsed.get('to')
+
+        if not result.get('hasNextPage'):
+            break
+        cursor = result.get('nextCursor')
+
+    return owner
+
+
+def find_sui_stamp_object(address, file_hash):
+    """Return the object ID of the Stamp `address` holds for `file_hash`."""
+    if not file_hash.startswith('0x'):
+        file_hash = '0x' + file_hash
+    target = file_hash.lower()
+
+    struct_type = f'{SUI_PACKAGE_ID}::stamp::Stamp'
+    cursor = None
+
+    for _ in range(SUI_EVENT_MAX_PAGES):
+        result = sui_rpc('suix_getOwnedObjects', [
+            address,
+            {'filter': {'StructType': struct_type}, 'options': {'showContent': True}},
+            cursor,
+            SUI_EVENT_PAGE_SIZE,
+        ])
+        if not result:
+            break
+
+        for entry in result.get('data', []):
+            content = (entry.get('data') or {}).get('content') or {}
+            fields = content.get('fields') or {}
+            if bytes_field_to_hex(fields.get('file_hash')).lower() == target:
+                return entry['data']['objectId']
+
+        if not result.get('hasNextPage'):
+            break
+        cursor = result.get('nextCursor')
+
+    return None
 
 
 # ============ Helpers ============

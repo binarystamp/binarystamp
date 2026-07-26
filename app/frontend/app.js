@@ -1,53 +1,20 @@
 // ============ BinaryStamp Frontend ============
 
+import {
+    connectEvmWallet,
+    stampOnEvm,
+    transferOnEvm,
+    connectSuiWallet,
+    stampOnSui,
+    transferOnSui,
+} from './chains.js';
+
 const API = '';
 let currentHash = null;
 let currentChain = 'evm';
-let walletAddress = null;
-
-// ============ Contract ABI (minimal for client-side) ============
-const STAMP_ABI = [
-    {
-        "inputs": [
-            {"name": "fileHash", "type": "bytes32"},
-            {"name": "metadataHash", "type": "bytes32"},
-            {"name": "walrusBlobId", "type": "string"},
-            {"name": "description", "type": "string"}
-        ],
-        "name": "stamp",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [{"name": "fileHash", "type": "bytes32"}],
-        "name": "isStamped",
-        "outputs": [{"name": "", "type": "bool"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{"name": "fileHash", "type": "bytes32"}],
-        "name": "getLatestStamp",
-        "outputs": [{
-            "components": [
-                {"name": "fileHash", "type": "bytes32"},
-                {"name": "metadataHash", "type": "bytes32"},
-                {"name": "walrusBlobId", "type": "string"},
-                {"name": "owner", "type": "address"},
-                {"name": "timestamp", "type": "uint256"},
-                {"name": "description", "type": "string"}
-            ],
-            "name": "",
-            "type": "tuple"
-        }],
-        "stateMutability": "view",
-        "type": "function"
-    }
-];
-
-// Contract address on Base Sepolia
-const CONTRACT_ADDRESS = '0x5969D7558d3409ac70ebdF24063AeC7257d0aCe3';
+let walletAddress = null;   // EVM address
+let suiConnection = null;   // {wallet, account, address}
+let verifiedStamp = null;   // last successful lookup, drives the transfer panel
 
 // ============ Init ============
 
@@ -154,6 +121,7 @@ function setupButtons() {
             document.querySelectorAll('.chain-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentChain = btn.dataset.chain;
+            renderWallet();
         });
     });
 
@@ -174,6 +142,12 @@ function setupButtons() {
         }
     });
 
+    // Transfer button
+    document.getElementById('btn-transfer').addEventListener('click', doTransfer);
+    document.getElementById('transfer-to').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doTransfer();
+    });
+
     // AI ask button
     document.getElementById('btn-ai-ask').addEventListener('click', doAiAsk);
     document.getElementById('ai-question').addEventListener('keydown', e => {
@@ -186,21 +160,63 @@ function setupButtons() {
 
 // ============ Wallet ============
 
-async function connectWallet() {
-    if (!window.ethereum) {
-        alert('Please install MetaMask or another Web3 wallet');
+function shortAddress(address) {
+    return address.slice(0, 6) + '...' + address.slice(-4);
+}
+
+// Reflects whichever wallets are currently connected for the selected chain.
+function renderWallet() {
+    const btn = document.getElementById('btn-connect');
+    const addrEl = document.getElementById('wallet-address');
+
+    const parts = [];
+    if (walletAddress && currentChain !== 'sui') parts.push(shortAddress(walletAddress));
+    if (suiConnection && currentChain !== 'evm') parts.push('Sui ' + shortAddress(suiConnection.address));
+
+    if (!parts.length) {
+        btn.classList.remove('hidden');
+        addrEl.classList.add('hidden');
         return;
     }
-    try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        walletAddress = accounts[0];
-        document.getElementById('btn-connect').classList.add('hidden');
-        const addrEl = document.getElementById('wallet-address');
-        addrEl.textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
-        addrEl.classList.remove('hidden');
-    } catch (e) {
-        console.error('Wallet connection failed:', e);
+
+    btn.classList.toggle('hidden', !needsWallet());
+    addrEl.textContent = parts.join('  ·  ');
+    addrEl.classList.remove('hidden');
+}
+
+// True when the selected chain still has an unconnected wallet.
+function needsWallet() {
+    if (currentChain === 'evm') return !walletAddress;
+    if (currentChain === 'sui') return !suiConnection;
+    return !walletAddress || !suiConnection;
+}
+
+async function connectWallet() {
+    const wantEvm = currentChain === 'evm' || currentChain === 'both';
+    const wantSui = currentChain === 'sui' || currentChain === 'both';
+    const failures = [];
+
+    if (wantEvm && !walletAddress) {
+        try {
+            walletAddress = await connectEvmWallet();
+        } catch (e) {
+            console.error('EVM wallet connection failed:', e);
+            failures.push(e.message);
+        }
     }
+
+    if (wantSui && !suiConnection) {
+        try {
+            suiConnection = await connectSuiWallet();
+        } catch (e) {
+            console.error('Sui wallet connection failed:', e);
+            failures.push(e.message);
+        }
+    }
+
+    renderWallet();
+
+    if (failures.length) showToast(failures.join('  '));
 }
 
 // ============ Stamp Action ============
@@ -244,38 +260,34 @@ async function doStamp() {
             }
         }
 
-        // Try client-side signing with MetaMask
-        if (window.ethereum && walletAddress && CONTRACT_ADDRESS) {
+        // Sign with the user's own wallet so the stamp is owned by them.
+        const targets = currentChain === 'both' ? ['evm', 'sui'] : [currentChain];
+        const results = [];
+        const errors = [];
+
+        for (const chain of targets) {
             try {
-                const result = await stampOnChain(currentHash, metadataHash, walrusBlobId, description);
-                showStampResult(resultEl, true, result);
-                return;
+                if (chain === 'evm') {
+                    if (!walletAddress) walletAddress = await connectEvmWallet();
+                    results.push(await stampOnEvm(
+                        walletAddress, currentHash, metadataHash, walrusBlobId, description));
+                } else {
+                    if (!suiConnection) suiConnection = await connectSuiWallet();
+                    results.push(await stampOnSui(
+                        suiConnection, currentHash, metadataHash, walrusBlobId, description));
+                }
             } catch (e) {
-                console.error('On-chain stamp failed:', e);
+                console.error('Stamp on ' + chain + ' failed:', e);
+                errors.push(chain.toUpperCase() + ': ' + e.message);
             }
         }
 
-        // Fallback: server-side stamp
-        const resp = await fetch(API + '/api/stamp', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                fileHash: '0x' + currentHash,
-                metadataHash: metadataHash,
-                walrusBlobId: walrusBlobId,
-                description: description
-            })
-        });
-        const data = await resp.json();
-        if (data.success) {
-            showStampResult(resultEl, true, data);
-        } else if (data.unsigned) {
-            showStampResult(resultEl, true, {
-                message: 'Connect wallet to sign transaction',
-                ...data
-            });
+        renderWallet();
+
+        if (results.length) {
+            showStampResult(resultEl, true, {results: results, errors: errors});
         } else {
-            showStampResult(resultEl, false, data);
+            showStampResult(resultEl, false, {error: errors.join('  ') || 'Stamp failed'});
         }
     } catch (e) {
         showStampResult(resultEl, false, {error: e.message});
@@ -285,48 +297,138 @@ async function doStamp() {
     }
 }
 
-async function stampOnChain(fileHash, metadataHash, walrusBlobId, description) {
-    // Use ethers.js-free approach with raw eth calls
-    const iface = new ethers.Interface(STAMP_ABI);
-    const data = iface.encodeFunctionData('stamp', [
-        '0x' + fileHash,
-        metadataHash,
-        walrusBlobId,
-        description
-    ]);
-
-    const txHash = await window.ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [{
-            from: walletAddress,
-            to: CONTRACT_ADDRESS,
-            data: data,
-            gas: '0x493E0' // 300000
-        }]
-    });
-
-    return {txHash: txHash, chain: 'evm'};
-}
+const CHAIN_LABELS = {evm: 'Base Sepolia', sui: 'Sui Testnet'};
 
 function showStampResult(el, success, data) {
     el.classList.remove('hidden');
-    if (success) {
-        let html = '<div class="result-success">';
-        html += '<div class="result-row"><span class="result-label">Status</span><span class="result-value" style="color:var(--success)">&#10003; Stamped</span></div>';
-        if (data.txHash) {
-            html += '<div class="result-row"><span class="result-label">Transaction</span><span class="result-value">' + data.txHash.slice(0, 10) + '...' + data.txHash.slice(-8) + '</span></div>';
-        }
-        if (data.blockNumber) {
-            html += '<div class="result-row"><span class="result-label">Block</span><span class="result-value">' + data.blockNumber + '</span></div>';
-        }
-        if (data.message) {
-            html += '<div class="result-row"><span class="result-label">Note</span><span class="result-value">' + data.message + '</span></div>';
-        }
-        html += '</div>';
-        el.innerHTML = html;
-    } else {
-        el.innerHTML = '<div class="result-error">&#10007; ' + (data.error || 'Stamp failed') + '</div>';
+
+    if (!success) {
+        el.innerHTML = '<div class="result-error">&#10007; ' + escapeHtml(data.error || 'Stamp failed') + '</div>';
+        return;
     }
+
+    let html = '<div class="result-success">';
+    html += '<div class="result-row"><span class="result-label">Status</span>'
+        + '<span class="result-value" style="color:var(--success)">&#10003; Stamped</span></div>';
+
+    for (const result of data.results || []) {
+        const short = result.txHash.slice(0, 10) + '...' + result.txHash.slice(-8);
+        html += '<div class="result-row"><span class="result-label">'
+            + escapeHtml(CHAIN_LABELS[result.chain] || result.chain) + '</span>'
+            + '<span class="result-value"><a href="' + escapeHtml(result.explorer)
+            + '" target="_blank" rel="noopener">' + escapeHtml(short) + '</a></span></div>';
+    }
+
+    html += '</div>';
+
+    // A partial success ("Both" where one chain failed) still shows what landed.
+    for (const error of data.errors || []) {
+        html += '<div class="result-error">&#10007; ' + escapeHtml(error) + '</div>';
+    }
+
+    el.innerHTML = html;
+}
+
+// ============ Transfer Action ============
+
+// Only offer a transfer for a stamp we actually located on a chain we can sign
+// for. An ENS-resolved result carries no chain, so it does not qualify.
+function showTransferPanel(data, hash) {
+    const panel = document.getElementById('transfer-panel');
+    const chainEl = document.getElementById('transfer-chain');
+    const resultEl = document.getElementById('transfer-result');
+
+    resultEl.classList.add('hidden');
+    document.getElementById('transfer-to').value = '';
+
+    if (!data.found || !hash) {
+        verifiedStamp = null;
+        panel.classList.add('hidden');
+        return;
+    }
+
+    const chain = data.source === 'sui' ? 'sui' : 'evm';
+    verifiedStamp = {hash: hash, chain: chain, owner: data.owner};
+
+    chainEl.textContent = CHAIN_LABELS[chain];
+    panel.classList.remove('hidden');
+}
+
+function isAddressForChain(address, chain) {
+    if (chain === 'evm') return /^0x[0-9a-fA-F]{40}$/.test(address);
+    return /^0x[0-9a-fA-F]{64}$/.test(address);
+}
+
+async function doTransfer() {
+    if (!verifiedStamp) return;
+
+    const btn = document.getElementById('btn-transfer');
+    const resultEl = document.getElementById('transfer-result');
+    const newOwner = document.getElementById('transfer-to').value.trim();
+
+    resultEl.classList.add('hidden');
+
+    if (!isAddressForChain(newOwner, verifiedStamp.chain)) {
+        showTransferResult(resultEl, false, {
+            error: verifiedStamp.chain === 'evm'
+                ? 'Enter a 20-byte EVM address (0x + 40 hex characters)'
+                : 'Enter a 32-byte Sui address (0x + 64 hex characters)',
+        });
+        return;
+    }
+
+    btn.classList.add('loading');
+    btn.disabled = true;
+
+    try {
+        let result;
+
+        if (verifiedStamp.chain === 'evm') {
+            if (!walletAddress) walletAddress = await connectEvmWallet();
+            result = await transferOnEvm(walletAddress, verifiedStamp.hash, newOwner);
+        } else {
+            if (!suiConnection) suiConnection = await connectSuiWallet();
+
+            const resp = await fetch(API + '/api/sui/stamp-object?address='
+                + encodeURIComponent(suiConnection.address)
+                + '&hash=' + encodeURIComponent(verifiedStamp.hash));
+            const owned = await resp.json();
+            if (!owned.found) {
+                throw new Error('The connected Sui wallet does not hold a stamp for this file');
+            }
+
+            result = await transferOnSui(suiConnection, owned.objectId, newOwner);
+        }
+
+        renderWallet();
+        showTransferResult(resultEl, true, {...result, newOwner: newOwner});
+    } catch (e) {
+        console.error('Transfer failed:', e);
+        showTransferResult(resultEl, false, {error: e.message});
+    } finally {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+    }
+}
+
+function showTransferResult(el, success, data) {
+    el.classList.remove('hidden');
+
+    if (!success) {
+        el.innerHTML = '<div class="result-error">&#10007; ' + escapeHtml(data.error || 'Transfer failed') + '</div>';
+        return;
+    }
+
+    const short = data.txHash.slice(0, 10) + '...' + data.txHash.slice(-8);
+    el.innerHTML = '<div class="result-success">'
+        + '<div class="result-row"><span class="result-label">Status</span>'
+        + '<span class="result-value" style="color:var(--success)">&#10003; Transferred</span></div>'
+        + '<div class="result-row"><span class="result-label">New owner</span>'
+        + '<span class="result-value">' + escapeHtml(data.newOwner) + '</span></div>'
+        + '<div class="result-row"><span class="result-label">Transaction</span>'
+        + '<span class="result-value"><a href="' + escapeHtml(data.explorer)
+        + '" target="_blank" rel="noopener">' + escapeHtml(short) + '</a></span></div>'
+        + '</div>';
 }
 
 // ============ Verify Action ============
@@ -355,7 +457,7 @@ async function doVerify(input) {
 
         const resp = await fetch(API + '/api/lookup?hash=' + encodeURIComponent(hash));
         const data = await resp.json();
-        showVerifyResult(resultEl, data);
+        showVerifyResult(resultEl, data, hash);
     } catch (e) {
         resultEl.classList.remove('hidden');
         resultEl.innerHTML = '<div class="result-error">&#10007; ' + e.message + '</div>';
@@ -364,8 +466,9 @@ async function doVerify(input) {
     }
 }
 
-function showVerifyResult(el, data) {
+function showVerifyResult(el, data, hash) {
     el.classList.remove('hidden');
+    showTransferPanel(data, hash);
     if (data.found) {
         let html = '<div class="result-success">';
         html += '<div class="result-row"><span class="result-label">Status</span><span class="result-value" style="color:var(--success)">&#10003; Found</span></div>';
@@ -493,6 +596,23 @@ function setDropZoneLoading(zone, loading, statusText) {
         text.classList.remove('hidden');
         status.classList.add('hidden');
     }
+}
+
+let toastTimer = null;
+
+function showToast(message) {
+    let toast = document.getElementById('toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.className = 'toast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add('visible');
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('visible'), 6000);
 }
 
 function escapeHtml(str) {

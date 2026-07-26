@@ -76,8 +76,15 @@ case "${1:-help}" in
         fi
         ;;
     build)
-        info "Building..."
+        info "Building frontend Sui bundle..."
+        if command -v npm &>/dev/null; then
+            (cd app && npm install --silent --no-audit --no-fund && npm run build)
+            success "Sui bundle built"
+        else
+            warn "npm not found - skipping Sui bundle (frontend/vendor/sui.js is committed)"
+        fi
         if command -v docker-compose &>/dev/null; then
+            info "Building container..."
             docker-compose build
         fi
         success "Build complete"
