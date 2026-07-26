@@ -129,7 +129,8 @@ async function stamp(ctx) {
     await dropFile(ctx, 'drop-zone');
     emit('HASH', ctx.doc.getElementById('file-hash').textContent);
     emit('HASH_MATCHES', String(ctx.doc.getElementById('file-hash').textContent === HELLO_SHA256));
-    emit('FORM_VISIBLE', String(!ctx.doc.getElementById('stamp-form').classList.contains('hidden')));
+    emit('CLAIM_PANEL_VISIBLE', String(!ctx.doc.getElementById('claim-panel').classList.contains('hidden')));
+    emit('LOOKUP_SAYS_UNCLAIMED', String(/not stamped/i.test(ctx.doc.getElementById('lookup-result').textContent)));
     emit('CHAIN_SWITCHES', String((() => {
         click(ctx.window, ctx.doc.querySelector('[data-chain="sui"]'));
         return ctx.doc.querySelector('[data-chain="sui"]').classList.contains('active')
@@ -190,8 +191,8 @@ const NEW_EVM_OWNER = '0x2222222222222222222222222222222222222222';
 const NEW_SUI_OWNER = '0x' + '33'.repeat(32);
 
 async function verify(ctx, hash) {
-    ctx.doc.getElementById('verify-hash-input').value = hash;
-    click(ctx.window, ctx.doc.getElementById('btn-verify'));
+    ctx.doc.getElementById('hash-input').value = hash;
+    click(ctx.window, ctx.doc.getElementById('btn-check'));
     await new Promise(r => setTimeout(r, 800));
 }
 
@@ -276,6 +277,71 @@ async function transfer(ctx, newOwner) {
     const result = await transfer(ctx, '0xnot-an-address');
     emit('XFER_REJECTS_BAD_ADDRESS', String(result.includes('✗')));
     emit('XFER_BAD_ADDRESS_NO_TX', String(!ctx.captured.evm));
+}
+
+// ============ Unified flow ============
+
+// A stamped file shows its provenance and offers no claim form.
+{
+    const ctx = await bootPage({
+        lookup: {
+            found: true,
+            owner: EVM_ACCOUNT,
+            timestamp: 1700000000,
+            description: 'design doc v2',
+            walrusBlobId: 'blob123',
+            source: 'subgraph',
+        },
+    });
+    await dropFile(ctx, 'drop-zone');
+    const text = ctx.doc.getElementById('lookup-result').textContent;
+
+    emit('FOUND_SHOWS_STAMPED', String(/Stamped/.test(text)));
+    emit('FOUND_SHOWS_OWNER', String(text.includes(EVM_ACCOUNT)));
+    emit('FOUND_SHOWS_WHEN', String(/Stamped/.test(text) && text.includes('20')));
+    emit('FOUND_SHOWS_METADATA', String(text.includes('design doc v2') && text.includes('blob123')));
+    emit('FOUND_SHOWS_CHAIN', String(text.includes('Base Sepolia')));
+    emit('FOUND_HIDES_CLAIM', String(ctx.doc.getElementById('claim-panel').classList.contains('hidden')));
+    emit('FOUND_ERRORS', ctx.errors.length);
+}
+
+// After stamping, the claim form gives way to a pending state — no second claim.
+{
+    const ctx = await bootPage({withEvm: true});
+    await dropFile(ctx, 'drop-zone');
+    await selectChain(ctx, 'evm');
+    ctx.doc.getElementById('stamp-desc').value = 'my notes';
+    await stamp(ctx);
+
+    const lookup = ctx.doc.getElementById('lookup-result').textContent;
+    emit('AFTER_STAMP_HIDES_CLAIM', String(ctx.doc.getElementById('claim-panel').classList.contains('hidden')));
+    emit('AFTER_STAMP_SHOWS_PENDING', String(/awaiting confirmation/i.test(lookup)));
+    emit('AFTER_STAMP_SHOWS_OWNER', String(lookup.includes(EVM_ACCOUNT)));
+    emit('AFTER_STAMP_SHOWS_NOTES', String(lookup.includes('my notes')));
+    emit('AFTER_STAMP_KEEPS_TX', String(/Stamped/.test(ctx.doc.getElementById('stamp-result').textContent)));
+
+    // Re-checking before the indexer catches up must not re-offer the claim.
+    click(ctx.window, ctx.doc.getElementById('btn-recheck'));
+    await new Promise(r => setTimeout(r, 800));
+    emit('RECHECK_KEEPS_CLAIM_HIDDEN', String(ctx.doc.getElementById('claim-panel').classList.contains('hidden')));
+    emit('RECHECK_STILL_PENDING', String(/awaiting confirmation/i.test(ctx.doc.getElementById('lookup-result').textContent)));
+}
+
+// Pasted input: malformed hashes are rejected without a lookup.
+{
+    const ctx = await bootPage({});
+    await verify(ctx, 'plainly-not-a-hash');
+    const text = ctx.doc.getElementById('lookup-result').textContent;
+    emit('BAD_HASH_REJECTED', String(/not a SHA-256 hash/i.test(text)));
+    emit('BAD_HASH_NO_CLAIM', String(ctx.doc.getElementById('claim-panel').classList.contains('hidden')));
+}
+
+// A valid pasted hash behaves like a dropped file.
+{
+    const ctx = await bootPage({lookup: {found: false}});
+    await verify(ctx, FILE_HASH);
+    emit('PASTED_HASH_SHOWS_HASH', ctx.doc.getElementById('file-hash').textContent);
+    emit('PASTED_HASH_OFFERS_CLAIM', String(!ctx.doc.getElementById('claim-panel').classList.contains('hidden')));
 }
 
 console.log(out.join('\n'));

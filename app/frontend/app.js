@@ -15,39 +15,22 @@ let currentChain = 'evm';
 let walletAddress = null;   // EVM address
 let suiConnection = null;   // {wallet, account, address}
 let verifiedStamp = null;   // last successful lookup, drives the transfer panel
+let aiAvailable = false;    // from /api/health; hides the AI panel when unconfigured
+let pendingStamp = null;    // a stamp we submitted that the registry has not indexed yet
 
 // ============ Init ============
 
 document.addEventListener('DOMContentLoaded', () => {
-    setupNav();
-    setupDropZones();
+    setupDropZone();
     setupButtons();
     checkHealth();
 });
 
-// ============ Navigation ============
+// ============ Drop Zone ============
 
-function setupNav() {
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById('view-' + btn.dataset.view).classList.add('active');
-        });
-    });
-}
-
-// ============ Drop Zones ============
-
-function setupDropZones() {
-    setupDropZone('drop-zone', 'file-input', handleStampFile);
-    setupDropZone('verify-drop-zone', 'verify-file-input', handleVerifyFile);
-}
-
-function setupDropZone(zoneId, inputId, handler) {
-    const zone = document.getElementById(zoneId);
-    const input = document.getElementById(inputId);
+function setupDropZone() {
+    const zone = document.getElementById('drop-zone');
+    const input = document.getElementById('file-input');
 
     zone.addEventListener('click', () => input.click());
     zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
@@ -55,9 +38,9 @@ function setupDropZone(zoneId, inputId, handler) {
     zone.addEventListener('drop', e => {
         e.preventDefault();
         zone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) handler(e.dataTransfer.files[0]);
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
     });
-    input.addEventListener('change', () => { if (input.files.length) handler(input.files[0]); });
+    input.addEventListener('change', () => { if (input.files.length) handleFile(input.files[0]); });
 }
 
 // ============ File Handling ============
@@ -75,34 +58,36 @@ function formatSize(bytes) {
     return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-async function handleStampFile(file) {
+// Hash locally, then go straight to the lookup — the file never leaves here.
+async function handleFile(file) {
     const zone = document.getElementById('drop-zone');
+    resetPanels();
+
     setDropZoneLoading(zone, true, 'Hashing ' + file.name + '...');
-
     const hash = await hashFile(file);
-    currentHash = hash;
-
     setDropZoneLoading(zone, false);
-    document.getElementById('file-hash').textContent = '0x' + hash;
-    document.getElementById('file-name').textContent = file.name;
-    document.getElementById('file-size').textContent = formatSize(file.size);
-    document.getElementById('hash-result').classList.remove('hidden');
-    document.getElementById('stamp-form').classList.remove('hidden');
-    document.getElementById('stamp-result').classList.add('hidden');
+
+    showHash('0x' + hash, file.name, formatSize(file.size));
+    document.getElementById('hash-input').value = '';
+
+    await checkHash('0x' + hash);
 }
 
-async function handleVerifyFile(file) {
-    const zone = document.getElementById('verify-drop-zone');
-    const resultEl = document.getElementById('verify-result');
-    resultEl.classList.add('hidden');
+function showHash(hash, name, size) {
+    document.getElementById('file-hash').textContent = hash;
+    document.getElementById('file-name').textContent = name || '';
+    document.getElementById('file-size').textContent = size || '';
+    document.getElementById('hash-result').classList.remove('hidden');
+}
 
-    setDropZoneLoading(zone, true, 'Hashing ' + file.name + '...');
-    const hash = await hashFile(file);
-    document.getElementById('verify-hash-input').value = '0x' + hash;
-
-    setDropZoneLoading(zone, true, 'Looking up hash on-chain...');
-    await doVerify('0x' + hash);
-    setDropZoneLoading(zone, false);
+function resetPanels() {
+    currentHash = null;
+    verifiedStamp = null;
+    pendingStamp = null;
+    for (const id of ['lookup-result', 'claim-panel', 'transfer-panel', 'ai-panel',
+                      'stamp-result', 'transfer-result', 'ai-answer']) {
+        document.getElementById(id).classList.add('hidden');
+    }
 }
 
 // ============ Buttons ============
@@ -128,18 +113,10 @@ function setupButtons() {
     // Stamp button
     document.getElementById('btn-stamp').addEventListener('click', doStamp);
 
-    // Verify button
-    document.getElementById('btn-verify').addEventListener('click', () => {
-        const input = document.getElementById('verify-hash-input').value.trim();
-        if (input) doVerify(input);
-    });
-
-    // Enter key on verify input
-    document.getElementById('verify-hash-input').addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
-            const input = e.target.value.trim();
-            if (input) doVerify(input);
-        }
+    // Check button
+    document.getElementById('btn-check').addEventListener('click', doCheck);
+    document.getElementById('hash-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doCheck();
     });
 
     // Transfer button
@@ -284,11 +261,17 @@ async function doStamp() {
 
         renderWallet();
 
-        if (results.length) {
-            showStampResult(resultEl, true, {results: results, errors: errors});
-        } else {
+        if (!results.length) {
             showStampResult(resultEl, false, {error: errors.join('  ') || 'Stamp failed'});
+            return;
         }
+
+        showStampResult(resultEl, true, {results: results, errors: errors});
+
+        // The transaction is submitted but not yet indexed, so the registry
+        // would still report the file as unclaimed. Show what just landed
+        // instead of re-querying and contradicting it.
+        showClaimedPending(results[0], description, walrusBlobId);
     } catch (e) {
         showStampResult(resultEl, false, {error: e.message});
     } finally {
@@ -431,123 +414,239 @@ function showTransferResult(el, success, data) {
         + '</div>';
 }
 
-// ============ Verify Action ============
+// ============ Lookup ============
 
-async function doVerify(input) {
-    const btn = document.getElementById('btn-verify');
-    const resultEl = document.getElementById('verify-result');
+// Entry point for the pasted-hash / ENS input.
+async function doCheck() {
+    const raw = document.getElementById('hash-input').value.trim();
+    if (!raw) return;
+
+    const btn = document.getElementById('btn-check');
     btn.classList.add('loading');
-    resultEl.classList.add('hidden');
+    btn.disabled = true;
+    resetPanels();
+    document.getElementById('hash-result').classList.add('hidden');
 
     try {
-        let hash = input;
-
-        // Check if it's an ENS name
-        if (input.includes('.binarystamp.eth') || input.includes('.eth')) {
-            const ensResp = await fetch(API + '/api/ens/resolve/' + encodeURIComponent(input));
-            const ensData = await ensResp.json();
-            if (ensData.resolved) {
-                showVerifyResult(resultEl, ensData);
-                return;
-            }
+        // An ENS name resolves to an owner but not to a hash we could stamp.
+        if (raw.endsWith('.eth')) {
+            const resp = await fetch(API + '/api/ens/resolve/' + encodeURIComponent(raw));
+            const data = await resp.json();
+            showEnsResult(data, raw);
+            return;
         }
 
-        // Clean up hash
-        if (!hash.startsWith('0x')) hash = '0x' + hash;
+        const hash = raw.startsWith('0x') ? raw : '0x' + raw;
+        if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) {
+            showLookupError('That is not a SHA-256 hash. Expected 0x followed by 64 hex characters.');
+            return;
+        }
 
-        const resp = await fetch(API + '/api/lookup?hash=' + encodeURIComponent(hash));
-        const data = await resp.json();
-        showVerifyResult(resultEl, data, hash);
+        showHash(hash.toLowerCase(), '', '');
+        await checkHash(hash.toLowerCase());
     } catch (e) {
-        resultEl.classList.remove('hidden');
-        resultEl.innerHTML = '<div class="result-error">&#10007; ' + e.message + '</div>';
+        showLookupError(e.message);
     } finally {
         btn.classList.remove('loading');
+        btn.disabled = false;
     }
 }
 
-function showVerifyResult(el, data, hash) {
-    el.classList.remove('hidden');
-    showTransferPanel(data, hash);
-    if (data.found) {
-        let html = '<div class="result-success">';
-        html += '<div class="result-row"><span class="result-label">Status</span><span class="result-value" style="color:var(--success)">&#10003; Found</span></div>';
-        html += '<div class="result-row"><span class="result-label">Owner</span><span class="result-value">' + (data.owner || 'N/A') + '</span></div>';
-        if (data.timestamp || data.firstStampedAt) {
-            const ts = data.timestamp || data.firstStampedAt;
-            const date = new Date(parseInt(ts) * 1000).toLocaleString();
-            html += '<div class="result-row"><span class="result-label">First Stamped</span><span class="result-value">' + date + '</span></div>';
-        }
-        if (data.stampCount) {
-            html += '<div class="result-row"><span class="result-label">Total Stamps</span><span class="result-value">' + data.stampCount + '</span></div>';
-        }
-        if (data.walrusBlobId) {
-            html += '<div class="result-row"><span class="result-label">Walrus Blob</span><span class="result-value">' + data.walrusBlobId + '</span></div>';
-        }
-        if (data.description) {
-            html += '<div class="result-row"><span class="result-label">Description</span><span class="result-value">' + escapeHtml(data.description) + '</span></div>';
-        }
-        if (data.source) {
-            html += '<div class="result-row"><span class="result-label">Source</span><span class="result-value">' + data.source + '</span></div>';
-        }
-        // Show stamps history if available
-        if (data.stamps && data.stamps.length > 1) {
-            html += '<div style="margin-top:12px;font-size:12px;color:var(--text-muted)">History (' + data.stamps.length + ' stamps)</div>';
-            for (const s of data.stamps) {
-                const d = new Date(parseInt(s.timestamp) * 1000).toLocaleString();
-                html += '<div class="result-row"><span class="result-label">#' + s.stampNumber + '</span><span class="result-value">' + s.owner.slice(0,8) + '... @ ' + d + '</span></div>';
-            }
-        }
-        html += '</div>';
-        el.innerHTML = html;
-    } else {
-        el.innerHTML = '<div class="result-not-found"><div class="result-row"><span class="result-label">Status</span><span class="result-value">Not found — this hash has not been stamped</span></div></div>';
+// Look a hash up and switch the page into "stamped" or "claimable" mode.
+async function checkHash(hash) {
+    currentHash = hash.slice(2);
+    const resultEl = document.getElementById('lookup-result');
+
+    setPanelBusy(resultEl, 'Checking the registry...');
+
+    try {
+        const resp = await fetch(API + '/api/lookup?hash=' + encodeURIComponent(hash));
+        const data = await resp.json();
+        showLookupResult(data, hash);
+    } catch (e) {
+        showLookupError(e.message);
     }
+}
+
+function setPanelBusy(el, message) {
+    el.classList.remove('hidden');
+    el.innerHTML = '<div class="result-pending">' + escapeHtml(message) + '</div>';
+}
+
+function showLookupError(message) {
+    const el = document.getElementById('lookup-result');
+    el.classList.remove('hidden');
+    el.innerHTML = '<div class="result-error">&#10007; ' + escapeHtml(message) + '</div>';
+}
+
+function row(label, value, style) {
+    return '<div class="result-row"><span class="result-label">' + escapeHtml(label)
+        + '</span><span class="result-value"' + (style ? ' style="' + style + '"' : '')
+        + '>' + value + '</span></div>';
+}
+
+const SOURCE_LABELS = {
+    subgraph: 'Base Sepolia',
+    contract: 'Base Sepolia',
+    sui: 'Sui Testnet',
+};
+
+function showLookupResult(data, hash) {
+    const el = document.getElementById('lookup-result');
+    el.classList.remove('hidden');
+
+    if (!data.found) {
+        if (pendingStamp) {
+            showClaimedPending(pendingStamp.result, pendingStamp.description,
+                               pendingStamp.walrusBlobId);
+            return;
+        }
+        el.innerHTML = '<div class="result-not-found">'
+            + row('Status', 'Not stamped &mdash; this file is unclaimed')
+            + '</div>';
+        showClaimPanel(true);
+        showTransferPanel({found: false}, null);
+        showAiPanel(false);
+        return;
+    }
+
+    pendingStamp = null;
+
+    let html = '<div class="result-success">';
+    html += row('Status', '&#10003; Stamped', 'color:var(--success)');
+    html += row('Owner', escapeHtml(data.owner || 'unknown'));
+
+    const ts = data.timestamp || data.firstStampedAt;
+    if (ts) html += row('Stamped', escapeHtml(new Date(parseInt(ts) * 1000).toLocaleString()));
+
+    if (SOURCE_LABELS[data.source]) html += row('Chain', escapeHtml(SOURCE_LABELS[data.source]));
+    if (data.transferred) html += row('Ownership', 'Transferred since it was stamped');
+    if (data.description) html += row('Notes', escapeHtml(data.description));
+    if (data.stampCount) html += row('Total stamps', escapeHtml(String(data.stampCount)));
+
+    if (data.walrusBlobId) {
+        html += row('Metadata', '<a href="' + API + '/api/walrus/fetch/'
+            + encodeURIComponent(data.walrusBlobId) + '" target="_blank" rel="noopener">'
+            + escapeHtml(data.walrusBlobId) + '</a>');
+    }
+
+    if (data.stamps && data.stamps.length > 1) {
+        html += '<div class="result-history">History (' + data.stamps.length + ' stamps)</div>';
+        for (const s of data.stamps) {
+            const d = new Date(parseInt(s.timestamp) * 1000).toLocaleString();
+            html += row('#' + s.stampNumber, escapeHtml(s.owner.slice(0, 10) + '... @ ' + d));
+        }
+    }
+
+    html += '</div>';
+    el.innerHTML = html;
+
+    showClaimPanel(false);
+    showTransferPanel(data, hash);
+    showAiPanel(true);
+}
+
+// An ENS name tells us the owner, but not a hash we could stamp or transfer.
+function showEnsResult(data, name) {
+    const el = document.getElementById('lookup-result');
+    el.classList.remove('hidden');
+
+    if (!data.resolved) {
+        el.innerHTML = '<div class="result-not-found">'
+            + row('Status', escapeHtml(name) + ' does not resolve to a stamp')
+            + '</div>';
+        showClaimPanel(false);
+        showAiPanel(false);
+        return;
+    }
+
+    let html = '<div class="result-success">';
+    html += row('Status', '&#10003; Resolved', 'color:var(--success)');
+    html += row('Name', escapeHtml(data.name || name));
+    html += row('Owner', escapeHtml(data.owner || 'unknown'));
+    if (data.description) html += row('Notes', escapeHtml(data.description));
+    if (data.walrusBlobId) html += row('Metadata', escapeHtml(data.walrusBlobId));
+    html += '</div>';
+    el.innerHTML = html;
+
+    showClaimPanel(false);
+    showAiPanel(false);
+}
+
+// A freshly submitted stamp is on-chain but not yet indexed, so a re-query
+// would report it unclaimed. Show the pending state and let the user re-check.
+function showClaimedPending(result, description, walrusBlobId) {
+    pendingStamp = {result: result, description: description, walrusBlobId: walrusBlobId};
+
+    const owner = result.chain === 'sui'
+        ? (suiConnection && suiConnection.address)
+        : walletAddress;
+
+    let html = '<div class="result-success">';
+    html += row('Status', '&#10003; Stamped &mdash; awaiting confirmation', 'color:var(--success)');
+    if (owner) html += row('Owner', escapeHtml(owner));
+    html += row('Chain', escapeHtml(CHAIN_LABELS[result.chain] || result.chain));
+    if (description) html += row('Notes', escapeHtml(description));
+    if (walrusBlobId) html += row('Metadata', escapeHtml(walrusBlobId));
+    html += '</div>';
+    html += '<button id="btn-recheck" class="btn btn-outline btn-full">Check again</button>';
+
+    const el = document.getElementById('lookup-result');
+    el.classList.remove('hidden');
+    el.innerHTML = html;
+
+    document.getElementById('btn-recheck').addEventListener('click', () => {
+        if (currentHash) checkHash('0x' + currentHash);
+    });
+
+    showClaimPanel(false);
+    showAiPanel(false);
+}
+
+function showClaimPanel(show) {
+    const panel = document.getElementById('claim-panel');
+    panel.classList.toggle('hidden', !show);
+    if (show) document.getElementById('stamp-result').classList.add('hidden');
+}
+
+function showAiPanel(show) {
+    document.getElementById('ai-panel').classList.toggle('hidden', !show || !aiAvailable);
+    document.getElementById('ai-answer').classList.add('hidden');
 }
 
 // ============ AI Agent ============
 
+// Only offered on a stamp we just looked up, so the hash is implicit.
 async function doAiAsk() {
-    const hashInput = document.getElementById('ai-hash').value.trim();
     const question = document.getElementById('ai-question').value.trim();
-    if (!question) return;
+    if (!question || !currentHash) return;
 
     const btn = document.getElementById('btn-ai-ask');
-    const messages = document.getElementById('ai-messages');
+    const answerEl = document.getElementById('ai-answer');
+
     btn.classList.add('loading');
-
-    // Add user message
-    const userMsg = document.createElement('div');
-    userMsg.className = 'ai-message user';
-    userMsg.textContent = question;
-    messages.appendChild(userMsg);
-    messages.scrollTop = messages.scrollHeight;
-
-    document.getElementById('ai-question').value = '';
+    btn.disabled = true;
+    answerEl.classList.remove('hidden');
+    answerEl.innerHTML = '<div class="result-pending">Analysing provenance...</div>';
 
     try {
         const resp = await fetch(API + '/api/ai/provenance', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                fileHash: hashInput || currentHash || '',
-                question: question
-            })
+            body: JSON.stringify({fileHash: '0x' + currentHash, question: question}),
         });
         const data = await resp.json();
-
-        const aiMsg = document.createElement('div');
-        aiMsg.className = 'ai-message assistant';
-        aiMsg.innerHTML = simpleMarkdown(data.answer || 'No data available for this hash.');
-        messages.appendChild(aiMsg);
+        if (data.answer) {
+            answerEl.innerHTML = simpleMarkdown(data.answer);
+        } else {
+            answerEl.innerHTML = '<div class="result-error">&#10007; '
+                + escapeHtml(data.error || 'No provenance data for this hash.') + '</div>';
+        }
     } catch (e) {
-        const errMsg = document.createElement('div');
-        errMsg.className = 'ai-message assistant';
-        errMsg.textContent = 'Error: ' + e.message;
-        messages.appendChild(errMsg);
+        answerEl.innerHTML = '<div class="result-error">&#10007; ' + escapeHtml(e.message) + '</div>';
     } finally {
         btn.classList.remove('loading');
-        messages.scrollTop = messages.scrollHeight;
+        btn.disabled = false;
     }
 }
 
@@ -557,12 +656,19 @@ async function checkHealth() {
     try {
         const resp = await fetch(API + '/api/health');
         const data = await resp.json();
-        if (data.evm) document.getElementById('badge-evm').style.borderColor = 'var(--success)';
-        if (data.subgraph) document.getElementById('badge-graph').style.borderColor = 'var(--success)';
-        if (data.walrus) document.getElementById('badge-walrus').style.borderColor = 'var(--success)';
-        if (data.ai) document.getElementById('badge-ens').style.borderColor = 'var(--success)';
-        // Show AI status in footer
-        if (data.ai) {
+
+        const badges = {
+            'badge-evm': data.evm,
+            'badge-sui': data.sui,
+            'badge-graph': data.subgraph,
+            'badge-walrus': data.walrus,
+        };
+        for (const [id, configured] of Object.entries(badges)) {
+            if (configured) document.getElementById(id).style.borderColor = 'var(--success)';
+        }
+
+        aiAvailable = Boolean(data.ai);
+        if (aiAvailable) {
             const aiBadge = document.createElement('span');
             aiBadge.className = 'chain-badge';
             aiBadge.textContent = 'AI Agent';

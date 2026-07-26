@@ -54,30 +54,53 @@ virtualenv otherwise. Other commands:
 ./_start clean      # remove venv, containers, images
 ```
 
-## 4. Stamp a file
+## 4. Check a file
 
-1. Open the **Stamp** tab and drop any file onto the drop zone. It is hashed
-   with SHA-256 **in your browser** — the file itself is never uploaded.
-2. Optionally add a description, and tick *Store metadata on Walrus*.
-3. Choose **Base (EVM)**, **Sui**, or **Both**.
-4. Click **Register Stamp**. Your wallet asks you to sign.
+Drop any file onto the drop zone, or paste a SHA-256 hash. The file is hashed
+with SHA-256 **in your browser** — it is never uploaded. The hash is then
+looked up across The Graph, the Base contract, and the Sui event log.
+
+There is a single screen, and what it offers depends on what it finds.
+
+### If the file is already stamped
+
+You see who owns it, when it was stamped, which chain it lives on, and any
+description or Walrus metadata attached to it. If ownership has moved since,
+that is noted too.
+
+Two things appear below the result:
+
+- **Transfer ownership** — hand the stamp to another address. Sign with the
+  wallet that currently owns it. Addresses are validated per chain: 20 bytes
+  for Base, 32 for Sui.
+- **Ask about this file's history** — a provenance question answered from the
+  indexed data. Only shown when `ANTHROPIC_API_KEY` is configured.
+
+### If the file is not stamped
+
+You get a **Claim this file** form:
+
+1. Optionally add a description, and tick *Store metadata on Walrus*.
+2. Choose **Base (EVM)**, **Sui**, or **Both**.
+3. Click **Register Stamp**. Your wallet asks you to sign.
 
 The result links to the transaction on a block explorer. With **Both**, each
 chain is reported separately — if one fails, the other still shows.
+
+Immediately after stamping the file reads as *awaiting confirmation*: the
+transaction is on-chain but the indexer has not caught up, so the registry
+would still report it unclaimed. **Check again** re-queries. The claim form
+stays closed in the meantime so you cannot stamp the same file twice.
 
 You need testnet funds to pay gas:
 
 - Base Sepolia ETH — <https://www.alchemy.com/faucets/base-sepolia>
 - Sui testnet SUI — <https://faucet.sui.io>
 
-## 5. Verify a file
+### ENS names
 
-Open **Verify** and either drop the file again or paste its hash. The lookup
-checks The Graph, then the Base contract, then the Sui event log.
-
-If a stamp is found, a **Transfer ownership** panel appears below the result.
-Enter an address and sign to hand the stamp to someone else. Addresses are
-validated per chain — 20 bytes for Base, 32 for Sui.
+Pasting `<hash>.binarystamp.eth` resolves the name to its owner. A name is not
+a hash, so no claim or transfer is offered for one.
 
 ## Server-side stamping
 

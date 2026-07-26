@@ -6,7 +6,8 @@ BinaryStamp lets anyone register the SHA-256 hash of any file on a blockchain, c
 
 ## Features
 
-- **Drag & Drop Stamping** — Hash any file client-side, register it on-chain in one click
+- **One Screen** — Drop a file: if it is claimed you see by whom and when, if not you can claim it
+- **Client-Side Hashing** — SHA-256 in the browser; the file itself is never uploaded
 - **Multi-Chain** — Stamp on Base (EVM), Sui, or both at once — signed by your own wallet
 - **Walrus Storage** — Metadata stored on Walrus decentralized blob storage
 - **ENS Resolution** — Resolve `<hash>.binarystamp.eth` to its owner via CCIP-Read
@@ -31,10 +32,11 @@ for Sui. Your wallet signs the transaction, so the stamp is owned by you.
 ## How It Works
 
 1. **Hash** — File is SHA-256 hashed entirely in-browser (never uploaded)
-2. **Store** — Optional metadata stored on Walrus
-3. **Stamp** — Hash + metadata registered on-chain (Base / Sui)
-4. **Verify** — Anyone can check a file's hash against the on-chain registry
-5. **Resolve** — `<hash>.binarystamp.eth` resolves to the owner address
+2. **Check** — The hash is looked up across The Graph, Base, and Sui
+3. **Store** — Optional metadata stored on Walrus
+4. **Stamp** — Unclaimed hashes can be registered on-chain (Base / Sui)
+5. **Transfer** — Stamps can be handed to another address
+6. **Resolve** — `<hash>.binarystamp.eth` resolves to the owner address
 
 ## Architecture
 
@@ -44,17 +46,22 @@ User drops file
     v
 SHA-256 (client-side)
     |
-    +---> Walrus (metadata storage)
-    |
-    +---> EVM Contract (Base) ---> The Graph (indexing)
-    |
-    +---> Sui Contract (Move)
-    |
     v
+Lookup ---> The Graph ---> EVM Contract (Base) ---> Sui event log
+    |
+    +-- stamped ------> owner, date, metadata
+    |                   + transfer ownership
+    |                   + AI provenance agent
+    |
+    +-- unstamped ----> claim it
+                        |
+                        +---> Walrus (metadata storage)
+                        |
+                        +---> EVM Contract (Base) ---> The Graph
+                        |
+                        +---> Sui Contract (Move)
+
 ENS CCIP-Read Gateway <--- binarystamp.eth subdomains
-    |
-    v
-AI Agent (provenance analysis via The Graph)
 ```
 
 ## Tech Stack

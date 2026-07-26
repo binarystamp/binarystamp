@@ -86,33 +86,6 @@ header {
 
 .logo-icon { color: var(--text); }
 
-nav {
-    display: flex;
-    gap: 2px;
-    background: var(--bg-hover);
-    border-radius: var(--radius);
-    padding: 2px;
-}
-
-.nav-btn {
-    background: none;
-    border: none;
-    padding: 6px 14px;
-    font-size: 13px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    border-radius: calc(var(--radius) - 2px);
-    font-family: var(--font);
-    transition: all 0.15s;
-}
-
-.nav-btn.active {
-    background: var(--bg);
-    color: var(--text);
-    box-shadow: var(--shadow);
-}
-
-.nav-btn:hover:not(.active) { color: var(--text); }
 
 .wallet-area { margin-left: auto; }
 
@@ -450,88 +423,6 @@ input[type="checkbox"] {
     max-width: 60%;
 }
 
-/* ============ AI Chat ============ */
-.ai-chat {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.ai-messages {
-    max-height: 400px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.ai-message {
-    padding: 12px 16px;
-    border-radius: var(--radius);
-    font-size: 14px;
-    line-height: 1.6;
-}
-
-.ai-message.system {
-    background: var(--bg-hover);
-    color: var(--text-secondary);
-    font-size: 13px;
-}
-
-.ai-message.user {
-    background: var(--accent);
-    color: var(--bg);
-    align-self: flex-end;
-    max-width: 80%;
-}
-
-.ai-message.assistant {
-    background: var(--bg-hover);
-    border: 1px solid var(--border);
-}
-
-.ai-message.assistant h3, .ai-message.assistant h4 {
-    font-size: 14px;
-    margin: 8px 0 4px;
-}
-
-.ai-message.assistant code {
-    font-family: var(--mono);
-    font-size: 12px;
-    background: var(--bg);
-    padding: 1px 4px;
-    border-radius: 3px;
-}
-
-.ai-message.assistant hr {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 8px 0;
-}
-
-.ai-message.assistant li {
-    margin-left: 16px;
-    list-style: disc;
-}
-
-.ai-message.assistant td {
-    padding: 4px 8px;
-    border-bottom: 1px solid var(--border-light);
-    font-size: 13px;
-}
-
-.ai-hash-input {
-    font-family: var(--mono);
-    font-size: 12px;
-}
-
-.ai-input-row {
-    display: flex;
-    gap: 8px;
-}
-
-.ai-input-row input { flex: 1; }
-
 /* ============ Spinner ============ */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner { animation: spin 0.8s linear infinite; }
@@ -553,7 +444,6 @@ input[type="checkbox"] {
     .drop-zone { padding: 32px 16px; }
     .chain-options { flex-wrap: wrap; }
     .footer-inner { flex-direction: column; gap: 8px; }
-    .nav-btn { padding: 6px 10px; font-size: 12px; }
 }
 
 /* ============ Toast ============ */
@@ -596,7 +486,7 @@ input[type="checkbox"] {
     border-top: 1px solid var(--border);
 }
 
-.transfer-header {
+.panel-header {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -605,15 +495,75 @@ input[type="checkbox"] {
     color: var(--text);
 }
 
-.transfer-header svg {
+.panel-header svg {
     color: var(--text-secondary);
     flex-shrink: 0;
 }
 
-.transfer-header .chain-badge {
+.panel-header .chain-badge {
     margin-left: auto;
 }
 
 .transfer-panel .subtitle {
     margin: 4px 0 16px;
+}
+
+/* ============ Claim / AI panels ============ */
+
+.claim-panel,
+.ai-panel {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+
+.claim-panel .panel-header {
+    margin-bottom: 16px;
+}
+
+.result-pending {
+    padding: 12px 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.result-history {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+#btn-recheck {
+    margin-top: 12px;
+}
+
+.ai-answer {
+    margin-top: 12px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.ai-answer h3,
+.ai-answer h4 {
+    margin: 12px 0 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.ai-answer h3:first-child,
+.ai-answer h4:first-child {
+    margin-top: 0;
+}
+
+.ai-answer code {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.ai-answer hr {
+    border: none;
+    border-top: 1px solid var(--border-light);
+    margin: 12px 0;
 }

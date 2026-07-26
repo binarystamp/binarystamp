@@ -13,7 +13,7 @@ app/
 ├── requirements.txt        # Python dependencies
 ├── Dockerfile              # Alpine-based container
 ├── frontend/
-│   ├── index.html          # Single-page UI
+│   ├── index.html          # Single-view UI (lookup, claim, transfer, AI)
 │   ├── style.css           # ASTA design, light/dark mode
 │   ├── app.js              # UI wiring, client-side hashing, API calls
 │   ├── chains.js           # EVM calldata encoding + Sui wallet/transactions
@@ -161,10 +161,24 @@ Sui has no hash index on-chain, so lookups scan `StampCreated` events via
 `suix_queryEvents`. That is bounded by `SUI_EVENT_MAX_PAGES`; a busy registry
 would want a real indexer.
 
+## User Flow
+
+The UI is a single view rather than separate stamp and verify screens. A
+dropped file (or pasted hash) is hashed client-side and looked up; the result
+decides what is offered next:
+
+- **stamped** — owner, date, chain and metadata, plus a transfer panel and the
+  AI provenance question box
+- **unstamped** — a claim form with description, Walrus toggle and chain choice
+
+A stamp that has just been submitted is not yet indexed, so the lookup would
+still report it unclaimed. The UI holds a pending state and keeps the claim
+form closed until a re-check confirms it, which also prevents double stamping.
+
 ## Ownership Transfers
 
-The Verify view offers a transfer once a stamp is found, on whichever chain it
-was found on.
+A transfer is offered once a stamp is found, on whichever chain it was found
+on.
 
 **Base** — `transferStamp(bytes32,address)` reassigns `owner` on the latest
 stamp for that hash. Storage is the source of truth, so this is complete.

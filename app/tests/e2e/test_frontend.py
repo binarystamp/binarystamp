@@ -55,8 +55,9 @@ def test_file_is_hashed_in_browser(results):
     assert results['HASH_MATCHES'] == 'true', results.get('HASH')
 
 
-def test_stamp_form_appears_after_drop(results):
-    assert results['FORM_VISIBLE'] == 'true'
+def test_unstamped_file_offers_a_claim(results):
+    assert results['LOOKUP_SAYS_UNCLAIMED'] == 'true'
+    assert results['CLAIM_PANEL_VISIBLE'] == 'true'
 
 
 def test_chain_selector_switches(results):
@@ -188,6 +189,61 @@ def test_transfer_rejects_malformed_address(results):
 def test_transfer_rejects_malformed_address_before_signing(results):
     """Validation must happen before a wallet is asked to sign."""
     assert results['XFER_BAD_ADDRESS_NO_TX'] == 'true'
+
+
+# ============ Unified flow ============
+
+def test_stamped_file_shows_provenance(results):
+    assert results['FOUND_SHOWS_STAMPED'] == 'true'
+    assert results['FOUND_SHOWS_OWNER'] == 'true'
+    assert results['FOUND_SHOWS_WHEN'] == 'true'
+
+
+def test_stamped_file_shows_metadata(results):
+    assert results['FOUND_SHOWS_METADATA'] == 'true'
+
+
+def test_stamped_file_shows_chain(results):
+    assert results['FOUND_SHOWS_CHAIN'] == 'true'
+
+
+def test_stamped_file_offers_no_claim(results):
+    """An already-claimed file must not invite a second claim."""
+    assert results['FOUND_HIDES_CLAIM'] == 'true'
+
+
+def test_found_lookup_runs_without_errors(results):
+    assert results['FOUND_ERRORS'] == '0'
+
+
+def test_claim_form_closes_after_stamping(results):
+    assert results['AFTER_STAMP_HIDES_CLAIM'] == 'true'
+
+
+def test_pending_state_reports_what_was_submitted(results):
+    assert results['AFTER_STAMP_SHOWS_PENDING'] == 'true'
+    assert results['AFTER_STAMP_SHOWS_OWNER'] == 'true'
+    assert results['AFTER_STAMP_SHOWS_NOTES'] == 'true'
+
+
+def test_transaction_stays_visible_after_stamping(results):
+    assert results['AFTER_STAMP_KEEPS_TX'] == 'true'
+
+
+def test_recheck_before_indexing_does_not_reoffer_claim(results):
+    """Re-querying before the indexer catches up must not invite a double stamp."""
+    assert results['RECHECK_KEEPS_CLAIM_HIDDEN'] == 'true'
+    assert results['RECHECK_STILL_PENDING'] == 'true'
+
+
+def test_malformed_hash_is_rejected(results):
+    assert results['BAD_HASH_REJECTED'] == 'true'
+    assert results['BAD_HASH_NO_CLAIM'] == 'true'
+
+
+def test_pasted_hash_behaves_like_a_dropped_file(results):
+    assert results['PASTED_HASH_SHOWS_HASH'] == '0x' + 'ab' * 32
+    assert results['PASTED_HASH_OFFERS_CLAIM'] == 'true'
 
 
 # ============ Failure honesty ============
