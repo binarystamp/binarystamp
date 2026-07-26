@@ -659,7 +659,126 @@ agent B   derives the same <b>key</b> → already stamped → fetches result
         </div>
     </section>
 
-    <!-- 10. Future -->
+    <!-- 10. ENS -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">Under the hood — ENS</div>
+            <h2>Turning a digest into a name anyone can resolve</h2>
+            <p class="lead">
+                Every stamp is reachable as a real ENS name in any wallet or explorer — with no
+                subdomain ever registered on-chain. There are millions of possible stamps; minting
+                a name for each would be absurd.
+            </p>
+            <div class="mono-block">wallet asks for  <b>&lt;hash&gt;.binarystamp.eth</b>
+   │
+   ├─ no such subdomain in the registry
+   ├─ walks up to <b>binarystamp.eth</b>, finds our resolver
+   ├─ resolver supports wildcards (ENSIP-10), so it is asked anyway
+   ├─ it answers with a <b>revert</b>: “not here — go ask this URL” (EIP-3668)
+   ├─ wallet calls our gateway, which queries the subgraph
+   └─ resolver's callback returns the answer → <b>owner address</b></div>
+            <p class="note">
+                A deliberate revert used as a redirect looks odd, but it is what lets one deployed
+                resolver answer for an unbounded namespace, with the data staying live rather than
+                frozen at registration time. Worth noting the gateway is trusted today: the
+                callback passes its answer straight through. Signing responses so the resolver can
+                check them on-chain is the obvious hardening.
+            </p>
+        </div>
+    </section>
+
+    <!-- 11. ENS labels -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">Under the hood — ENS</div>
+            <h2>A hex digest will not fit in a name</h2>
+            <p class="lead">
+                Wildcard resolution encodes the name in DNS wire format, where a single label is
+                capped at <strong>63 bytes</strong>. A SHA-256 digest in hex is 64 characters — 66
+                with <code>0x</code>. Clients reject it before a single request leaves the machine.
+            </p>
+            <div class="mono-block">hex     d3ab…1274.binarystamp.eth      <b>64 chars — rejected</b>
+base36  59x6n7u66bsd…rpkdw.binarystamp.eth   <b>50 chars — resolves</b></div>
+            <div class="grid grid-3">
+                <div class="card">
+                    <h3>Same 256 bits</h3>
+                    <p>Base36 is denser than hex, so the whole digest survives — nothing is truncated.</p>
+                </div>
+                <div class="card">
+                    <h3>Padded to fixed width</h3>
+                    <p>Without it a digest with leading zero bytes would encode short, and names would stop mapping one-to-one onto hashes.</p>
+                </div>
+                <div class="card">
+                    <h3>Two names per stamp</h3>
+                    <p>By digest — derivable from the file alone — and by stamp number, which is shorter to share.</p>
+                </div>
+            </div>
+            <p class="note">
+                The reverse direction is used too: an owner's address is resolved back to their
+                primary ENS name for display. That name is only shown if resolving it forward
+                returns to the same address — otherwise anyone could claim to be anyone.
+            </p>
+        </div>
+    </section>
+
+    <!-- 12. The Graph -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">Under the hood — The Graph</div>
+            <h2>Contracts store state; history lives in events</h2>
+            <p class="lead">
+                Asking a contract “who owns this hash” is cheap. Asking “who has ever owned it, and
+                when did each change happen” is not — that history exists only as logs. A subgraph
+                indexes those logs into something queryable.
+            </p>
+            <div class="mono-block">contract emits   <b>StampCreated</b> · <b>StampTransferred</b>
+                       │
+subgraph indexes them into
+   <b>Stamp</b>            every stamp, with its metadata
+   <b>Transfer</b>         each change of ownership
+   <b>FileHashLookup</b>   digest → current owner, in one hop
+   <b>OwnerStats</b>       what an address holds</div>
+            <div class="grid grid-3">
+                <div class="card">
+                    <h3>Instant verification</h3>
+                    <p>A lookup is one indexed query rather than a scan across chain history.</p>
+                </div>
+                <div class="card">
+                    <h3>Full provenance chain</h3>
+                    <p>Every transfer is retained, so the whole ownership trail can be replayed.</p>
+                </div>
+                <div class="card">
+                    <h3>It answers ENS too</h3>
+                    <p>The CCIP gateway and the provenance agent both read from the same index.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 13. Sui and Walrus -->
+    <section class="slide">
+        <div class="slide-inner">
+            <div class="eyebrow">Under the hood — Sui and Walrus</div>
+            <h2>Ownership as an object, metadata as a blob</h2>
+            <p class="lead">
+                Sui models assets as objects rather than ledger entries, which suits a stamp
+                precisely: the record <em>is</em> a thing you hold, and transferring it moves the
+                object itself rather than editing a field that claims who owns it.
+            </p>
+            <div class="rows">
+                <div class="row"><div class="row-label">Move contract</div><div class="row-value">A stamp is an object owned by your address. A shared registry anchors the package; events carry the history.</div></div>
+                <div class="row"><div class="row-label">Transfer means transfer</div><div class="row-value">The object is passed by value to its new owner — not marked as theirs while staying in your account.</div></div>
+                <div class="row"><div class="row-label">Walrus blobs</div><div class="row-value">Optional metadata — description, context, a result digest — stored as a decentralized blob rather than as expensive chain data.</div></div>
+                <div class="row"><div class="row-label">Bound by digest</div><div class="row-value">The stamp records the blob's hash, so altered metadata no longer matches what was stamped.</div></div>
+            </div>
+            <p class="note">
+                Same digest, two chains, independently verifiable. Stamp on Base, on Sui, or on both
+                — a claim that does not depend on any single network surviving.
+            </p>
+        </div>
+    </section>
+
+    <!-- 14. Future -->
     <section class="slide">
         <div class="slide-inner">
             <div class="eyebrow">Future improvements</div>
@@ -693,7 +812,7 @@ agent B   derives the same <b>key</b> → already stamped → fetches result
         </div>
     </section>
 
-    <!-- 11. Close -->
+    <!-- 15. Close -->
     <section class="slide">
         <div class="slide-inner">
             <div class="eyebrow">In one line</div>
