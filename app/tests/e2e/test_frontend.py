@@ -75,7 +75,7 @@ def test_sui_transaction_is_sent_to_wallet(results):
 
 def test_sui_targets_deployed_package(results):
     assert results['SUI_TARGET'] == (
-        '0xbc097815add0220a26bc2dff1b5b1184924828d9f14cfd835f2ccc25b8faabf7::stamp::stamp'
+        '0xc5487e68a3c6b4cb5a34992c976017178d52b865580d57943e660208d19abc9b::stamp::stamp'
     )
 
 
@@ -160,7 +160,7 @@ def test_evm_transfer_reports_success(results):
 
 def test_sui_transfer_calls_transfer_stamp(results):
     assert results['XFER_SUI_TARGET'] == (
-        '0xbc097815add0220a26bc2dff1b5b1184924828d9f14cfd835f2ccc25b8faabf7::stamp::transfer_stamp'
+        '0xc5487e68a3c6b4cb5a34992c976017178d52b865580d57943e660208d19abc9b::stamp::transfer_stamp'
     )
 
 

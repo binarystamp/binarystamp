@@ -77,8 +77,8 @@ AI Agent (provenance analysis via The Graph)
 | BinaryStamp Registry | Base Sepolia | [`0x5969D7558d3409ac70ebdF24063AeC7257d0aCe3`](https://sepolia.basescan.org/address/0x5969D7558d3409ac70ebdF24063AeC7257d0aCe3) |
 | ENS CCIP-Read Resolver | Ethereum Mainnet | [`0x61DF09Bf03f5693f8928F3aF9364EbC3a4D61D50`](https://etherscan.io/address/0x61DF09Bf03f5693f8928F3aF9364EbC3a4D61D50) |
 | Subgraph | The Graph (Base Sepolia) | [`binarystamp/binarystamp`](https://api.studio.thegraph.com/query/1757003/binarystamp/v0.0.1) |
-| BinaryStamp (Sui Move) | Sui Testnet | [`0xbc097815add0220a26bc2dff1b5b1184924828d9f14cfd835f2ccc25b8faabf7`](https://suiscan.xyz/testnet/object/0xbc097815add0220a26bc2dff1b5b1184924828d9f14cfd835f2ccc25b8faabf7) |
-| Sui Registry (shared object) | Sui Testnet | [`0xdf81de0890d624390235c1808d16f8a1e726b796e25cd0c159b9b4088371c6c1`](https://suiscan.xyz/testnet/object/0xdf81de0890d624390235c1808d16f8a1e726b796e25cd0c159b9b4088371c6c1) |
+| BinaryStamp (Sui Move) | Sui Testnet | [`0xc5487e68a3c6b4cb5a34992c976017178d52b865580d57943e660208d19abc9b`](https://suiscan.xyz/testnet/object/0xc5487e68a3c6b4cb5a34992c976017178d52b865580d57943e660208d19abc9b) |
+| Sui Registry (shared object) | Sui Testnet | [`0x2ba5935995d77fcae22d4403084a8f949da03ed49fbcad053cbd4df51c9a713e`](https://suiscan.xyz/testnet/object/0x2ba5935995d77fcae22d4403084a8f949da03ed49fbcad053cbd4df51c9a713e) |
 | ENS Name | Ethereum Mainnet | [`binarystamp.eth`](https://app.ens.domains/binarystamp.eth) |
 
 ## Links
